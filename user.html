@@ -1,0 +1,1211 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MISMO — User Portal</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore-compat.js"></script>
+  <script src="js/auth.js"></script>
+
+  <script>
+    // Initialize Firebase
+    const firebaseConfig = {
+        apiKey: "AIzaSyCvuP-0kROPoTBC1KgGe4DY6SQee1B6mnY",
+        authDomain: "mismo-cf2f7.firebaseapp.com",
+        projectId: "mismo-cf2f7",
+        storageBucket: "mismo-cf2f7.firebasestorage.app",
+        messagingSenderId: "488608965927",
+        appId: "1:488608965927:web:28c9468bec95f081b6b502"
+    };
+
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
+
+    // Check if user is authenticated and is a regular user
+    document.addEventListener('DOMContentLoaded', async () => {
+      // Wait for the shared auth observer to finish initial loading to avoid race redirects
+      const waitForAuthReady = async (timeout = 3000) => {
+        const start = Date.now();
+        // If window.isAuthLoading is undefined, assume observer hasn't initialized yet; wait until false or timeout
+        while (window.isAuthLoading === undefined || window.isAuthLoading) {
+          if (Date.now() - start > timeout) break;
+          await new Promise(r => setTimeout(r, 100));
+        }
+      };
+
+      await waitForAuthReady();
+
+      // Now safely check user type; do not auto-redirect on unexpected JS errors here
+      try {
+        await checkUserType('user');
+      } catch (err) {
+        console.error('Non-fatal checkUserType error:', err);
+      }
+    });
+  </script>
+
+  <style>
+    body {
+      background: linear-gradient(135deg, #f4f7f6, #e9f8ee);
+      font-family: "Poppins", sans-serif;
+      color: #333;
+      min-height: 100vh;
+    }
+
+    /* Navbar */
+    .navbar {
+      background: linear-gradient(90deg, #28a745, #2ecc71);
+      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+    }
+    .navbar-brand {
+      color: white !important;
+      font-weight: 700;
+      font-size: 1.4rem;
+      letter-spacing: 0.5px;
+    }
+    .navbar .btn {
+      background-color: white;
+      color: #28a745;
+      border-radius: 8px;
+      font-weight: 500;
+      transition: all 0.3s ease;
+    }
+    .navbar .btn:hover {
+      background-color: #e8f5e9;
+      transform: translateY(-2px);
+    }
+
+    /* Cards */
+    .card {
+      border: none;
+      border-radius: 16px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+      transition: all 0.3s ease;
+    }
+    .card:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 8px 18px rgba(0, 0, 0, 0.08);
+    }
+
+    .card h5 {
+      font-weight: 700;
+      font-size: 1.1rem;
+    }
+
+    /* Smaller spacing */
+    .card.p-4 { padding: 1.2rem !important; }
+    .form-label, .ticket-issue, .dictionary-item strong {
+      font-size: 0.9rem;
+    }
+    .form-control, .form-select, textarea {
+      font-size: 0.9rem;
+      padding: 0.45rem 0.75rem;
+    }
+
+    /* Buttons and Badges */
+    .btn-success {
+      border-radius: 8px;
+      font-weight: 500;
+      font-size: 0.9rem;
+      padding: 0.45rem 1rem;
+      transition: 0.3s;
+    }
+    .btn-success:hover {
+      background-color: #239b56;
+    }
+    .badge {
+      border-radius: 6px;
+      font-size: 0.8rem;
+    }
+
+    /* Form controls */
+    .form-control:focus, .form-select:focus {
+      box-shadow: 0 0 0 0.15rem rgba(25,135,84,0.12);
+      border-color: #198754;
+    }
+
+    /* Ticket list */
+    .ticket-row {
+      border-radius: 10px;
+      padding: 10px;
+      background: #fff;
+      margin-bottom: 10px;
+      display:flex;
+      gap: 10px;
+      align-items: center;
+      transition: transform .12s ease, box-shadow .12s ease;
+    }
+    .ticket-row:hover { 
+      transform: translateY(-3px); 
+      box-shadow: 0 6px 16px rgba(30,80,50,0.06); 
+    }
+    .ticket-thumb { 
+      width: 90px; 
+      height: 60px; 
+      object-fit:cover; 
+      border-radius:6px; 
+      background:#f1f4f2; 
+      border: 1px solid #eef6ee;
+    }
+    .ticket-meta { flex:1; min-width: 0; }
+    .ticket-id { font-weight:600; font-size:0.9rem; }
+    .ticket-time { color:#6b7280; font-size:0.8rem; }
+    .ticket-issue { font-weight:500; margin:2px 0; }
+
+    /* Dictionary */
+    .dictionary-item { 
+      background:#fff; 
+      border-radius:8px; 
+      padding:8px 10px; 
+      margin-bottom:8px; 
+      box-shadow: 0 4px 10px rgba(0,0,0,0.03); 
+    }
+    .dictionary-item small { 
+      color:#6b7280; 
+      display:block; 
+      margin-top:4px; 
+      font-size:0.8rem;
+    }
+
+    /* Empty state */
+    .empty-state { 
+      text-align:center; 
+      color:#6b7280; 
+      padding:14px 10px; 
+      font-size:0.9rem;
+    }
+
+    /* Chat and notifications */
+    .unread-badge {
+      width: 8px;
+      height: 8px;
+      background-color: #dc3545;
+      border-radius: 50%;
+      position: absolute;
+      top: -2px;
+      right: -2px;
+    }
+
+    .chat-btn {
+      position: relative;
+    }
+
+    .chat-message {
+      display: flex;
+      flex-direction: column;
+      max-width: 75%;
+      margin-bottom: 15px;
+    }
+
+    .chat-message.admin {
+      align-self: flex-start;
+    }
+
+    .chat-message.user {
+      align-self: flex-end;
+    }
+
+    .message-content {
+      padding: 10px 15px;
+      border-radius: 15px;
+      position: relative;
+    }
+
+    .chat-message.admin .message-content {
+      background-color: #f1f1f1;
+      border-bottom-left-radius: 5px;
+    }
+
+    .chat-message.user .message-content {
+      background-color: #28a745;
+      color: white;
+      border-bottom-right-radius: 5px;
+    }
+
+    .message-time {
+      font-size: 0.75rem;
+      margin-top: 4px;
+      opacity: 0.7;
+    }
+
+    /* Progress bar */
+    .progress { 
+      height: 8px; 
+      border-radius:8px; 
+      overflow:hidden; 
+      background:#f1f4f2; 
+    }
+    .progress .progress-bar { 
+      line-height:8px; 
+      font-size:0.7rem; 
+    }
+
+    /* User badge */
+    .user-badge {
+      background-color: white;
+      color: #28a745;
+      border-radius: 8px;
+      padding: 4px 10px;
+      font-weight: 500;
+    }
+
+    /* Modal */
+    .modal-content {
+      border-radius: 18px;
+      box-shadow: 0 8px 20px rgba(0,0,0,0.1);
+    }
+
+    /* Chat */
+    .chat-message {
+      display: flex;
+      flex-direction: column;
+    }
+    
+    .chat-message.user {
+      align-items: flex-end;
+    }
+    
+    .chat-message.admin {
+      align-items: flex-start;
+    }
+    
+    .message-content {
+      max-width: 70%;
+      word-wrap: break-word;
+    }
+    
+    .chat-user {
+      display: flex;
+      align-items: center;
+      padding: 10px;
+      border-radius: 12px;
+      cursor: pointer;
+      transition: 0.3s;
+    }
+    
+    .chat-user:hover {
+      background-color: #f1fdf4;
+      transform: scale(1.02);
+    }
+
+    /* Right panel fix */
+    #dictionaryList {
+      max-height: 55vh;
+      overflow:auto;
+      padding-right:4px;
+    }
+
+    /* Compact spacing for Submit form */
+    #ticketForm .col-md-6, #ticketForm .col-12 {
+      margin-bottom: 0.6rem;
+    }
+
+    .loading-spinner {
+      display: none;
+      text-align: center;
+      padding: 20px;
+    }
+
+    /* Chat form styles */
+    .chat-form-container {
+      margin-top: 20px;
+    }
+
+    @media (max-width: 991px) {
+      .card { padding: 1rem !important; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Navbar -->
+  <nav class="navbar navbar-expand-lg navbar-dark px-4">
+    <a class="navbar-brand" href="#">MISMO</a>
+    <div class="ms-auto d-flex align-items-center gap-3">
+      <div class="text-white small">Signed in as</div>
+      <div class="user-badge" id="user-badge">Guest</div>
+      <button id="logoutBtn" class="btn btn-sm btn-light">Logout</button>
+    </div>
+  </nav>
+
+  <!-- Dashboard -->
+  <div class="container-fluid py-4">
+    <div class="row p-4 mb-2">
+      <div class="col">
+        <h2 class="fw-bold text-success">User Portal</h2>
+        <p class="text-muted mb-0">Submit and track your support tickets</p>
+      </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="row g-3">
+      <!-- LEFT: Form + My Tickets + Chat -->
+      <div class="col-md-8">
+        <!-- Submit form -->
+        <div class="card p-4 mb-3">
+          <div class="d-flex align-items-center justify-content-between mb-3">
+            <h5 class="fw-bold mb-0">Submit a Ticket</h5>
+            <small class="text-muted">All fields required except image</small>
+          </div>
+
+          <form id="ticketForm" class="row gy-2">
+            <div class="col-md-6">
+              <label class="form-label">Full Name</label>
+              <input required id="name" class="form-control" placeholder="Juan Dela Cruz">
+            </div>
+
+            <div class="col-md-6">
+              <label class="form-label">School ID</label>
+              <input required id="schoolId" class="form-control" placeholder="2025-0001">
+            </div>
+
+            <div class="col-md-6">
+              <label class="form-label">College / Department</label>
+              <select required id="department" class="form-select">
+                <option value="">Select College/Department</option>
+                <option value="CCS">CCS</option>
+                <option value="IABE">IABE</option>
+                <option value="CAAF">CAAF</option>
+                <option value="CAS">CAS</option>
+                <option value="CBM">CBM</option>
+                <option value="CTE">CTE</option>
+              </select>
+            </div>
+
+            <div class="col-md-6">
+              <label class="form-label">Time (auto)</label>
+              <input id="timeField" class="form-control" readonly>
+            </div>
+
+            <div class="col-12">
+              <label class="form-label">Issue / Problem</label>
+              <select id="issueSelect" class="form-select" required>
+                <option value="">Choose or type issue...</option>
+                <option>Network Issue</option>
+                <option>Printer Not Working</option>
+                <option>Account Login Problem</option>
+                <option>Software Installation</option>
+                <option>Hardware Repair</option>
+                <option>Other</option>
+              </select>
+            </div>
+
+            <div class="col-12">
+              <label class="form-label">Describe the issue (brief)</label>
+              <textarea required id="description" class="form-control" rows="2" placeholder="Provide a short description..."></textarea>
+            </div>
+
+            <div class="col-md-6">
+              <label class="form-label">Attach image (optional)</label>
+              <input id="imageInput" accept="image/*" class="form-control" type="file">
+              <div class="mt-2" id="imagePreviewWrap" style="display:none;">
+                <img id="imagePreview" style="max-width:160px;border-radius:8px; border:1px solid #eef6ee; display:block;">
+                <small class="text-muted">Preview</small>
+              </div>
+            </div>
+
+            <div class="col-md-6 d-flex align-items-end justify-content-end">
+              <button type="submit" class="btn btn-success px-4">Submit Ticket</button>
+            </div>
+          </form>
+        </div>
+
+        <!-- My Tickets -->
+        <div class="card p-4 mb-3">
+          <div class="d-flex align-items-center justify-content-between mb-3">
+            <h5 class="fw-bold mb-0">My Tickets</h5>
+            <div>
+              <button id="clearAll" class="btn btn-sm btn-outline-secondary">Clear All</button>
+            </div>
+          </div>
+
+          <div class="loading-spinner" id="ticketsLoading">
+            <div class="spinner-border text-success" role="status">
+              <span class="visually-hidden">Loading...</span>
+            </div>
+            <p class="mt-2">Loading your tickets...</p>
+          </div>
+
+          <div id="ticketsList" aria-live="polite">
+            <!-- Tickets will be injected here from Firestore -->
+          </div>
+
+          <div id="noTickets" class="empty-state" style="display:none;">
+            <i class="bi bi-inbox" style="font-size:34px;color:#b7cbb8;"></i>
+            <div class="mt-2">No tickets yet — submit your first ticket above.</div>
+          </div>
+        </div>
+
+        <!-- Chat with Admin -->
+        <div class="card p-4">
+          <div class="d-flex align-items-center justify-content-between mb-3">
+            <h5 class="fw-bold mb-0">Chat with Admin</h5>
+            <small class="text-muted">General inquiries and support</small>
+          </div>
+          
+          <div class="chat-messages p-3 mb-3" id="chatMessages" style="height: 300px; overflow-y: auto; background-color: #f8f9fa; border-radius: 10px;">
+            <!-- Messages will be populated here -->
+            <div class="empty-state" id="noMessages">
+              <i class="bi bi-chat-dots" style="font-size:34px;color:#b7cbb8;"></i>
+              <div class="mt-2">No messages yet — start a conversation with admin</div>
+            </div>
+          </div>
+          
+          <div class="chat-input">
+            <div class="input-group">
+              <input type="text" class="form-control" id="messageInput" placeholder="Type your message...">
+              <button class="btn btn-success" id="sendMessage">Send</button>
+            </div>
+            <div class="mt-2">
+              <small class="text-muted">Your messages will be visible to all admins for general support</small>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- RIGHT: Frequent Issues Dictionary -->
+      <div class="col-md-4">
+        <div class="card p-4">
+          <div class="d-flex align-items-center justify-content-between mb-3">
+            <h5 class="fw-bold mb-0">Most Frequent Issues</h5>
+            <div style="width:54%">
+              <input id="dictSearch" class="form-control form-control-sm" placeholder="Search issues...">
+            </div>
+          </div>
+
+          <div class="loading-spinner" id="dictionaryLoading">
+            <div class="spinner-border text-success" role="status">
+              <span class="visually-hidden">Loading...</span>
+            </div>
+            <p class="mt-2">Loading dictionary...</p>
+          </div>
+
+          <div id="dictionaryList" style="max-height: 64vh; overflow:auto; padding-right:6px;">
+            <!-- Dictionary items with sample data -->
+            <div class="dictionary-item">
+              <strong>WiFi Connection Problems</strong>
+              <small>Restart your router, forget the network and reconnect, or move closer to the access point.</small>
+            </div>
+            <div class="dictionary-item">
+              <strong>Forgotten Password</strong>
+              <small>Use the 'Forgot Password' feature on the login page or contact the IT helpdesk for a reset.</small>
+            </div>
+            <div class="dictionary-item">
+              <strong>Printer Not Working</strong>
+              <small>Check if printer is online, clear any paper jams, restart printer service, or reinstall drivers.</small>
+            </div>
+            <div class="dictionary-item">
+              <strong>Software Installation Failed</strong>
+              <small>Run as administrator, check system requirements, disable antivirus temporarily, or download again.</small>
+            </div>
+            <div class="dictionary-item">
+              <strong>Email Not Sending/Receiving</strong>
+              <small>Check internet connection, verify email settings, clear cache, or restart email application.</small>
+            </div>
+            <div class="dictionary-item">
+              <strong>Slow Computer Performance</strong>
+              <small>Close unused applications, run disk cleanup, check for malware, or add more RAM if needed.</small>
+            </div>
+            <div class="dictionary-item">
+              <strong>Blue Screen Errors</strong>
+              <small>Note the error code, update drivers, run system diagnostics, or perform system restore.</small>
+            </div>
+            <div class="dictionary-item">
+              <strong>Browser Issues</strong>
+              <small>Clear browser cache and cookies, disable extensions, update browser, or try a different browser.</small>
+            </div>
+            <div class="dictionary-item">
+              <strong>Audio/Video Problems</strong>
+              <small>Check volume settings, update drivers, test with different applications, or restart device.</small>
+            </div>
+            <div class="dictionary-item">
+              <strong>File Access Denied</strong>
+              <small>Check file permissions, take ownership of files/folders, or contact system administrator.</small>
+            </div>
+            <div class="dictionary-item">
+              <strong>Application Crashes</strong>
+              <small>Update the application, check for conflicting software, reinstall, or run in compatibility mode.</small>
+            </div>
+            <div class="dictionary-item">
+              <strong>Keyboard/Mouse Not Working</strong>
+              <small>Check connections, try different USB ports, replace batteries if wireless, or update drivers.</small>
+            </div>
+            <div class="dictionary-item">
+              <strong>Monitor Display Issues</strong>
+              <small>Check cables, try different port, update graphics drivers, or adjust display settings.</small>
+            </div>
+            <div class="dictionary-item">
+              <strong>Network Drive Access</strong>
+              <small>Verify network connection, check permissions, remap the drive, or contact network admin.</small>
+            </div>
+            <div class="dictionary-item">
+              <strong>VPN Connection Problems</strong>
+              <small>Restart VPN client, check credentials, try different server, or temporarily disable firewall.</small>
+            </div>
+          </div>
+
+          <div class="mt-3">
+            <small class="text-muted">Tip: read the quick instructions before submitting — many issues are resolvable without a ticket.</small>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Ticket Details Modal (user-only view) -->
+    <div class="modal fade" id="ticketViewModal" tabindex="-1">
+      <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content">
+          <div class="modal-header bg-success text-white">
+            <h5 class="modal-title">Ticket Details</h5>
+            <button class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+          </div>
+
+          <div class="modal-body">
+            <div class="row g-3">
+              <div class="col-md-6">
+                <p><strong id="viewIssue">Issue</strong></p>
+                <p id="viewDesc" class="text-muted"></p>
+                <p><span class="text-muted">Submitted by:</span> <strong id="viewName"></strong></p>
+                <p><span class="text-muted">School ID:</span> <strong id="viewSchoolId"></strong></p>
+                <p><span class="text-muted">Department:</span> <strong id="viewDepartment"></strong></p>
+                <p><span class="text-muted">Time:</span> <strong id="viewTime"></strong></p>
+              </div>
+              <div class="col-md-6 text-center">
+                <div id="viewImageWrap" style="display:none;">
+                  <img id="viewImage" style="max-width:100%;border-radius:8px;border:1px solid #eef6ee">
+                  <div class="text-muted mt-2">Attached image</div>
+                </div>
+              </div>
+
+              <div class="col-12">
+                <div><strong>Progress</strong></div>
+                <div class="mt-2">
+                  <div class="progress"><div id="viewProgressBar" class="progress-bar" role="progressbar" style="width:0%">0%</div></div>
+                  <div class="d-flex justify-content-between mt-2 text-muted">
+                    <div>Pending</div><div>On Process</div><div>Processed</div>
+                  </div>
+                </div>
+              </div>
+              <div class="col-12 mt-3" id="viewRemarksWrap" style="display:none;">
+                <h6>Admin Remarks</h6>
+                <p><strong>Finished at:</strong> <span id="viewFinishedAt"></span></p>
+                <p><strong>Problem found:</strong> <span id="viewRemarkFound"></span></p>
+                <p><strong>Solution applied:</strong> <span id="viewRemarkSolution"></span></p>
+                <p><strong>Recommendation:</strong> <span id="viewRemarkRecommendation"></span></p>
+              </div>
+            </div>
+          </div>
+
+          <div class="modal-footer">
+            <!-- user-only actions: close & cancel ticket -->
+            <button id="cancelTicketBtn" class="btn btn-outline-danger">Cancel Ticket</button>
+            <button class="btn btn-success" data-bs-dismiss="modal">Close</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Bootstrap + JS -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+
+  <script>
+    // Firebase already initialized above in the head script; use the global `db` instance
+
+    // ------- utilities -------
+    const $ = (sel, ctx=document) => ctx.querySelector(sel);
+    const $$ = (sel, ctx=document) => Array.from(ctx.querySelectorAll(sel));
+    const nowStr = () => new Date().toLocaleString();
+
+    // Store the original static dictionary content
+    const originalDictionaryHTML = $('#dictionaryList').innerHTML;
+
+    // ------- load dictionary from Firestore -------
+    const dictWrap = $('#dictionaryList');
+    const dictLoading = $('#dictionaryLoading');
+
+    function loadDictionary(filter = '') {
+      dictLoading.style.display = 'block';
+      dictWrap.style.display = 'none';
+      
+      db.collection('dictionary')
+        .onSnapshot((snapshot) => {
+          // Only replace content if we actually have data from Firebase
+          if (!snapshot.empty) {
+            dictWrap.innerHTML = '';
+            const q = filter.trim().toLowerCase();
+            let hasItems = false;
+            
+            snapshot.forEach((doc) => {
+              const it = doc.data();
+              if (!q || (it.title + ' ' + it.keywords + ' ' + it.solution).toLowerCase().includes(q)) {
+                const el = document.createElement('div');
+                el.className = 'dictionary-item';
+                el.innerHTML = `<strong>${it.title}</strong><small>${it.solution}</small>`;
+                dictWrap.appendChild(el);
+                hasItems = true;
+              }
+            });
+            
+            if (!hasItems) {
+              dictWrap.innerHTML = '<div class="empty-state">No dictionary items matched your search.</div>';
+            }
+          }
+          // If no Firebase data, keep the original static content
+          
+          dictLoading.style.display = 'none';
+          dictWrap.style.display = 'block';
+        }, (error) => {
+          console.error("Error loading dictionary:", error);
+          // On error, keep the original static content and just hide the loading spinner
+          dictLoading.style.display = 'none';
+          dictWrap.style.display = 'block';
+        });
+    }
+
+    // Modified search function to work with static content
+    function searchDictionary(filter = '') {
+      const q = filter.trim().toLowerCase();
+      
+      if (!q) {
+        // If no filter, restore original content
+        dictWrap.innerHTML = originalDictionaryHTML;
+        return;
+      }
+      
+      // Filter the static content
+      const items = Array.from(dictWrap.querySelectorAll('.dictionary-item'));
+      let hasMatches = false;
+      
+      dictWrap.innerHTML = '';
+      
+      items.forEach(item => {
+        const text = item.textContent.toLowerCase();
+        if (text.includes(q)) {
+          dictWrap.appendChild(item.cloneNode(true));
+          hasMatches = true;
+        }
+      });
+      
+      if (!hasMatches) {
+        dictWrap.innerHTML = '<div class="empty-state">No dictionary items matched your search.</div>';
+      }
+    }
+
+    // Update event listener to use static search
+    $('#dictSearch').addEventListener('input', e => searchDictionary(e.target.value));
+
+    // ------- form + image preview -------
+    const form = $('#ticketForm');
+    const imageInput = $('#imageInput');
+    const imagePreviewWrap = $('#imagePreviewWrap');
+    const imagePreview = $('#imagePreview');
+    const timeField = $('#timeField');
+
+    function setTimeNow(){ timeField.value = new Date().toLocaleString(); }
+    setTimeNow();
+    setInterval(() => { setTimeNow() }, 60_000);
+
+    let lastImageData = null;
+    imageInput.addEventListener('change', () => {
+      const f = imageInput.files && imageInput.files[0];
+      if(!f){ imagePreviewWrap.style.display='none'; lastImageData=null; return; }
+      const reader = new FileReader();
+      reader.onload = e => {
+        lastImageData = e.target.result; // dataURL
+        imagePreview.src = lastImageData;
+        imagePreviewWrap.style.display='block';
+      }
+      reader.readAsDataURL(f);
+    });
+
+    // ------- ticket rendering from Firestore -------
+    const ticketsList = $('#ticketsList');
+    const noTickets = $('#noTickets');
+    const ticketsLoading = $('#ticketsLoading');
+
+    async function loadTickets() {
+      ticketsLoading.style.display = 'block';
+      ticketsList.style.display = 'none';
+
+      // Ensure user is authenticated and get uid
+      const { user } = await checkAuth();
+      const uid = user.uid;
+
+      // Safer: listen for tickets for this user and sort client-side to avoid index errors
+      db.collection('tickets')
+        .where('userId', '==', uid)
+        .onSnapshot((snapshot) => {
+          ticketsList.innerHTML = '';
+
+          if (snapshot.empty) {
+            noTickets.style.display = 'block';
+            ticketsList.style.display = 'none';
+            ticketsLoading.style.display = 'none';
+            return;
+          }
+
+          noTickets.style.display = 'none';
+
+          // collect tickets then sort by createdAt (descending)
+          const tickets = [];
+          snapshot.forEach(doc => {
+            const t = doc.data();
+            t.__docId = doc.id;
+            tickets.push(t);
+          });
+
+          tickets.sort((a, b) => {
+            const ta = a.createdAt && a.createdAt.seconds ? a.createdAt.seconds : 0;
+            const tb = b.createdAt && b.createdAt.seconds ? b.createdAt.seconds : 0;
+            return tb - ta;
+          });
+
+          tickets.forEach((ticket) => {
+            const row = document.createElement('div');
+            row.className = 'ticket-row';
+            row.dataset.ticketId = ticket.__docId;
+            row.dataset.id = ticket.__docId || '';
+
+            const thumb = document.createElement('img');
+            thumb.className = 'ticket-thumb';
+            thumb.src = ticket.image || 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="160" height="90"><rect width="100%" height="100%" fill="%23eef6ee"/><text x="50%" y="50%" fill="%2399a89b" dominant-baseline="middle" text-anchor="middle" font-size="12">No image</text></svg>';
+
+            const meta = document.createElement('div');
+            meta.className = 'ticket-meta';
+            meta.innerHTML = `
+              <div class="d-flex justify-content-between align-items-start">
+                <div>
+                  <div class="ticket-id">${ticket.id} <span class="text-muted"> · ${ticket.issue}</span></div>
+                  <div class="ticket-issue">${ticket.description}</div>
+                  <div class="ticket-time">${ticket.time} • ${ticket.name}</div>
+                </div>
+                <div style="min-width:160px" class="text-end">
+                  <div class="text-muted">Status</div>
+                  <div style="margin-top:6px;"><span class="badge ${getBadgeClass(ticket.status)}">${getStatusDisplayText(ticket.status)}</span></div>
+                </div>
+              </div>
+              <div class="mt-2">
+                <div class="progress"><div class="progress-bar ${getProgressColor(ticket.progress)}" role="progressbar" style="width:${ticket.progress}%">${ticket.progress}%</div></div>
+              </div>
+            `;
+
+            const actions = document.createElement('div');
+            actions.className = 'd-flex flex-column ticket-actions';
+            // Removed chat button from ticket actions
+            actions.innerHTML = `
+              <div class="d-flex gap-2">
+                <button title="View details" class="btn btn-sm btn-outline-primary"><i class="bi bi-eye"></i></button>
+                <button title="Cancel ticket" class="btn btn-sm btn-outline-danger"><i class="bi bi-x-circle"></i></button>
+              </div>
+            `;
+
+            // Wire actions
+            actions.querySelector('.btn-outline-primary').addEventListener('click', () => openTicketModal(ticket.__docId, ticket));
+            actions.querySelector('.btn-outline-danger').addEventListener('click', () => cancelTicket(ticket.__docId));
+
+            row.appendChild(thumb);
+            row.appendChild(meta);
+            row.appendChild(actions);
+            ticketsList.appendChild(row);
+          });
+
+          ticketsLoading.style.display = 'none';
+          ticketsList.style.display = 'block';
+        }, (error) => {
+          console.error("Error loading tickets:", error);
+          // fallback: try a one-time GET
+          db.collection('tickets').where('userId', '==', uid).get()
+            .then(snapshot => {
+              if (snapshot.empty) {
+                noTickets.style.display = 'block';
+                ticketsList.style.display = 'none';
+              }
+              ticketsLoading.style.display = 'none';
+            })
+            .catch(err => {
+              console.error('Fallback get failed:', err);
+              ticketsList.innerHTML = '<div class="empty-state text-danger">Error loading tickets</div>';
+              ticketsLoading.style.display = 'none';
+              ticketsList.style.display = 'block';
+            });
+        });
+    }
+
+    function getBadgeClass(status){
+      if(status === 'pending') return 'bg-warning text-dark';
+      if(status === 'on-process') return 'bg-info text-dark';
+      if(status === 'processed') return 'bg-success text-white';
+      return 'bg-secondary';
+    }
+
+    function getStatusDisplayText(status) {
+      const statusMap = {
+        'pending': 'Pending',
+        'on-process': 'On Process', 
+        'processed': 'Processed'
+      };
+      return statusMap[status] || status;
+    }
+    
+    function getProgressColor(p){
+      if(p >= 100) return 'bg-success';
+      if(p >= 60) return 'bg-info';
+      return 'bg-warning';
+    }
+
+    // ------- create ticket in Firestore -------
+    function uid(){ return 'T' + Date.now().toString(36).toUpperCase().slice(-6); }
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const name = $('#name').value.trim();
+      const schoolId = $('#schoolId').value.trim();
+      const department = $('#department').value;
+      const issue = $('#issueSelect').value || 'Other';
+      const description = $('#description').value.trim();
+      const time = timeField.value || nowStr();
+
+      if(!name || !schoolId || !department || !issue || !description){
+        alert('Please fill all required fields.');
+        return;
+      }
+
+      // Show loading state
+      const submitBtn = form.querySelector('button[type="submit"]');
+      const originalText = submitBtn.textContent;
+      submitBtn.textContent = 'Submitting...';
+      submitBtn.disabled = true;
+
+      try {
+        // Ensure current user info is attached to the ticket
+        const currentUser = firebase.auth().currentUser || (await checkAuth()).user;
+
+        const newTicket = {
+          id: uid(),
+          userId: currentUser.uid,
+          userEmail: currentUser.email,
+          name: name,
+          schoolId: schoolId,
+          department: department,
+          issue: issue,
+          description: description,
+          time: time,
+          image: lastImageData || null,
+          status: 'pending',
+          progress: 10,
+          createdAt: firebase.firestore.FieldValue.serverTimestamp()
+        };
+
+        console.log('Submitting ticket:', newTicket);
+
+        // Try to add to Firestore
+        const docRef = await db.collection('tickets').add(newTicket);
+        console.log('Ticket submitted successfully with ID:', docRef.id);
+        
+        // Clear form
+        $('#name').value = '';
+        $('#schoolId').value = '';
+        $('#department').value = '';
+        $('#issueSelect').value = '';
+        $('#description').value = '';
+        $('#imageInput').value = '';
+        imagePreviewWrap.style.display='none';
+        lastImageData = null;
+
+        alert('Ticket submitted successfully! Ticket ID: ' + newTicket.id + '\nYou can view progress in My Tickets.');
+
+      } catch (error) {
+        console.error("Error submitting ticket:", error);
+        
+        // More detailed error messages
+        if (error.code === 'permission-denied') {
+          alert('Error: Permission denied. Please check Firestore security rules.');
+        } else if (error.code === 'unavailable') {
+          alert('Error: Network unavailable. Please check your internet connection.');
+        } else {
+          alert('Error submitting ticket: ' + error.message + '\nPlease try again.');
+        }
+      } finally {
+        // Restore button state
+        submitBtn.textContent = originalText;
+        submitBtn.disabled = false;
+      }
+    });
+
+    // ------- cancel ticket from Firestore -------
+    async function cancelTicket(ticketId) {
+      if(!confirm('Cancel this ticket? You may need to resubmit if the issue persists.')) return;
+      
+      try {
+        await db.collection('tickets').doc(ticketId).delete();
+      } catch (error) {
+        console.error("Error canceling ticket:", error);
+        alert('Error canceling ticket. Please try again.');
+      }
+    }
+
+    // ------- ticket modal view -------
+    const ticketViewModalElem = $('#ticketViewModal');
+    const ticketModal = new bootstrap.Modal(ticketViewModalElem);
+    
+    function openTicketModal(ticketId, ticket) {
+      $('#viewIssue').textContent = ticket.issue;
+      $('#viewDesc').textContent = ticket.description;
+      $('#viewName').textContent = ticket.name;
+      $('#viewSchoolId').textContent = ticket.schoolId;
+      $('#viewDepartment').textContent = ticket.department;
+      $('#viewTime').textContent = ticket.time;
+      
+      if(ticket.image){
+        $('#viewImage').src = ticket.image;
+        $('#viewImageWrap').style.display = 'block';
+      } else {
+        $('#viewImageWrap').style.display = 'none';
+      }
+      
+      // Progress
+      updateModalProgress(ticket);
+
+      // Wire cancel button
+      $('#cancelTicketBtn').onclick = function(){
+        if(!confirm('Cancel this ticket?')) return;
+        cancelTicket(ticketId);
+        ticketModal.hide();
+      };
+
+      // Show admin remarks if present
+      if (ticket.remarks) {
+        $('#viewFinishedAt').textContent = ticket.finishedAt ? (ticket.finishedAt.toDate ? ticket.finishedAt.toDate().toLocaleString() : ticket.finishedAt) : '';
+        $('#viewRemarkFound').textContent = ticket.remarks.found || '';
+        $('#viewRemarkSolution').textContent = ticket.remarks.solution || '';
+        $('#viewRemarkRecommendation').textContent = ticket.remarks.recommendation || '';
+        $('#viewRemarksWrap').style.display = 'block';
+      } else {
+        $('#viewRemarksWrap').style.display = 'none';
+      }
+
+      ticketModal.show();
+    }
+    
+    function updateModalProgress(t){
+      const pb = $('#viewProgressBar');
+      pb.style.width = t.progress + '%';
+      pb.textContent = t.progress + '%';
+      pb.className = 'progress-bar ' + getProgressColor(t.progress);
+    }
+
+    // Chat functionality
+    let messageListener = null;
+
+    // Initialize chat when page loads
+    function initializeChat() {
+      const currentUser = firebase.auth().currentUser;
+      if (!currentUser) return;
+      
+      // Set up message listener for general chat - using 'chats' collection
+      if (messageListener) {
+        messageListener();
+      }
+
+      messageListener = db.collection('chats')
+        .where('senderId', '==', currentUser.uid)
+        .orderBy('timestamp')
+        .onSnapshot((snapshot) => {
+          const messages = $('#chatMessages');
+          const noMessages = $('#noMessages');
+          
+          const messagesList = [];
+          snapshot.forEach((doc) => {
+            const message = doc.data();
+            messagesList.push({
+              ...message,
+              id: doc.id,
+              timestamp: message.timestamp?.toDate() || new Date()
+            });
+          });
+
+          // Also get admin messages (where senderType is 'admin')
+          db.collection('chats')
+            .where('senderType', '==', 'admin')
+            .orderBy('timestamp')
+            .get()
+            .then((adminSnapshot) => {
+              adminSnapshot.forEach((doc) => {
+                const message = doc.data();
+                messagesList.push({
+                  ...message,
+                  id: doc.id,
+                  timestamp: message.timestamp?.toDate() || new Date()
+                });
+              });
+
+              // Sort all messages by timestamp
+              messagesList.sort((a, b) => a.timestamp - b.timestamp);
+
+              // Display messages
+              if (messagesList.length > 0) {
+                noMessages.style.display = 'none';
+                messages.innerHTML = '';
+                
+                messagesList.forEach((message) => {
+                  const messageElem = document.createElement('div');
+                  const isUser = message.senderId === currentUser.uid;
+                  messageElem.className = `chat-message ${isUser ? 'user' : 'admin'}`;
+                  messageElem.innerHTML = `
+                    <div class="message-content">
+                      ${message.text}
+                      <div class="message-time">${message.timestamp.toLocaleTimeString()}</div>
+                    </div>
+                  `;
+                  messages.appendChild(messageElem);
+                });
+              } else {
+                noMessages.style.display = 'block';
+              }
+
+              messages.scrollTop = messages.scrollHeight;
+            })
+            .catch(error => {
+              console.error("Error loading admin messages:", error);
+            });
+        }, (error) => {
+          console.error("Error loading user messages:", error);
+        });
+    }
+
+    // Send message handler
+    $('#sendMessage').addEventListener('click', async () => {
+      const messageInput = $('#messageInput');
+      const message = messageInput.value.trim();
+      
+      if (message) {
+        try {
+          const currentUser = firebase.auth().currentUser;
+          
+          await db.collection('chats').add({
+            senderId: currentUser.uid,
+            userEmail: currentUser.email,
+            text: message,
+            senderType: 'user',
+            timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+            readByAdmin: false
+          });
+          
+          messageInput.value = '';
+        } catch (error) {
+          console.error('Error sending message:', error);
+          alert('Failed to send message');
+        }
+      }
+    });
+
+    // Handle enter key in message input
+    $('#messageInput').addEventListener('keypress', (e) => {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        $('#sendMessage').click();
+      }
+    });
+
+    // ------- clear all tickets from Firestore -------
+    $('#clearAll').addEventListener('click', async () => {
+      if(!confirm('Clear all your tickets? This action cannot be undone.')) return;
+      
+      try {
+        const { user } = await checkAuth();
+        const uid = user.uid;
+        
+        const snapshot = await db.collection('tickets').where('userId', '==', uid).get();
+        const batch = db.batch();
+        
+        snapshot.forEach((doc) => {
+          batch.delete(doc.ref);
+        });
+        
+        await batch.commit();
+      } catch (error) {
+        console.error("Error clearing tickets:", error);
+        alert('Error clearing tickets. Please try again.');
+      }
+    });
+
+    // ------- user management -------
+    async function setUserInfo() {
+      try {
+        const { user, userData } = await checkAuth();
+        const name = (userData && (userData.name || userData.fullName)) || user.displayName || user.email || 'User';
+        document.getElementById('user-badge').textContent = name;
+        // Pre-fill the name field if empty
+        if (!$('#name').value.trim()) $('#name').value = name;
+        return true;
+      } catch (err) {
+        console.error('Error setting user info:', err);
+        return false;
+      }
+    }
+
+    // Wire logout button
+    const logoutBtn = document.getElementById('logoutBtn');
+    if (logoutBtn) logoutBtn.addEventListener('click', () => {
+      logout();
+    });
+
+    // Wait for auth to be ready, then set user info and load tickets
+    const initializeUserData = async () => {
+      // Wait for auth observer to finish loading
+      const waitForAuthReady = async (timeout = 3000) => {
+        const start = Date.now();
+        while (window.isAuthLoading === undefined || window.isAuthLoading) {
+          if (Date.now() - start > timeout) break;
+          await new Promise(r => setTimeout(r, 100));
+        }
+      };
+
+      await waitForAuthReady();
+      
+      // Get fresh auth data
+      try {
+        const { user, userData } = await checkAuth();
+        if (!user) {
+          console.log('[user] No authenticated user found');
+          return;
+        }
+
+        console.log('[user] Loading data for:', user.email);
+        
+        // Update UI with user info
+        const name = (userData && (userData.name || userData.fullName)) || user.displayName || user.email || 'User';
+        document.getElementById('user-badge').textContent = name;
+        if (!$('#name').value.trim()) $('#name').value = name;
+
+        // Load user's tickets
+        loadTickets();
+        
+        // Initialize chat
+        initializeChat();
+      } catch (err) {
+        console.error('[user] Error initializing user data:', err);
+      }
+    };
+
+    // Call on page load and whenever auth state changes
+    initializeUserData();
+    firebase.auth().onAuthStateChanged(() => {
+      console.log('[user] Auth state changed, reinitializing...');
+      initializeUserData();
+    });
+
+    // Hide dictionary loading spinner immediately since we have static content
+    dictLoading.style.display = 'none';
+
+  </script>
+</body>
+</html>

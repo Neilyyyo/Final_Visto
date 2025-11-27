@@ -1,0 +1,1849 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>MIS Ticket Dashboard</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet" />
+
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore-compat.js"></script>
+  <script src="js/auth.js"></script>
+
+  <script>
+    // Initialize Firebase
+    const firebaseConfig = {
+      apiKey: "AIzaSyCvuP-0kROPoTBC1KgGe4DY6SQee1B6mnY",
+      authDomain: "mismo-cf2f7.firebaseapp.com",
+      projectId: "mismo-cf2f7",
+      storageBucket: "mismo-cf2f7.firebasestorage.app",
+      messagingSenderId: "488608965927",
+      appId: "1:488608965927:web:28c9468bec95f081b6b502"
+    };
+
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
+
+    // Check if user is authenticated and is an admin
+    document.addEventListener('DOMContentLoaded', async () => {
+      try {
+        console.log('[admin] running checkUserType for admin page');
+        await checkUserType('admin');
+        console.log('[admin] checkUserType completed');
+        initializeAdminDashboard();
+      } catch (error) {
+        console.error('[admin] Authentication error:', error);
+        window.location.href = 'login.html';
+      }
+    });
+  </script>
+
+  <style>
+    :root {
+      --primary-color: #28a745;
+      --primary-dark: #239b56;
+      --primary-light: #e8f5e9;
+      --accent-color: #2ecc71;
+      --warning-color: #ffc107;
+      --info-color: #17a2b8;
+      --danger-color: #dc3545;
+      --light-bg: #f8f9fa;
+      --card-shadow: 0 8px 20px rgba(0, 0, 0, 0.05);
+      --hover-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+    }
+
+    body {
+      background: linear-gradient(135deg, #f4f7f6, #e9f8ee);
+      font-family: "Poppins", sans-serif;
+      color: #333;
+      min-height: 100vh;
+    }
+
+    .navbar {
+      background: linear-gradient(90deg, var(--primary-color), var(--accent-color));
+      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+    }
+
+    .navbar-brand {
+      color: white !important;
+      font-weight: 700;
+      font-size: 1.4rem;
+    }
+
+    .card {
+      border: none;
+      border-radius: 20px;
+      box-shadow: var(--card-shadow);
+      transition: 0.3s;
+    }
+
+    .card:hover {
+      transform: translateY(-5px);
+      box-shadow: var(--hover-shadow);
+    }
+
+    .sidebar {
+      background: white;
+      border-radius: 20px;
+      box-shadow: var(--card-shadow);
+      padding: 25px;
+    }
+
+    /* Enhanced Chat Styles */
+    .chat-user {
+      display: flex;
+      align-items: center;
+      padding: 12px 15px;
+      border-radius: 12px;
+      cursor: pointer;
+      transition: 0.3s;
+      margin-bottom: 8px;
+      border: 1px solid transparent;
+    }
+
+    .chat-user:hover {
+      background-color: var(--primary-light);
+      transform: scale(1.02);
+      border-color: var(--primary-color);
+    }
+
+    .chat-user.active {
+      background-color: var(--primary-light);
+      border-color: var(--primary-color);
+    }
+
+    .unread-badge {
+      background-color: var(--danger-color);
+      color: white;
+      border-radius: 50%;
+      width: 20px;
+      height: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.75rem;
+      font-weight: 600;
+      margin-left: auto;
+    }
+
+    .user-avatar {
+      width: 45px;
+      height: 45px;
+      border-radius: 50%;
+      margin-right: 12px;
+      object-fit: cover;
+      border: 2px solid var(--primary-color);
+    }
+
+    .user-info {
+      flex: 1;
+    }
+
+    .user-name {
+      font-weight: 600;
+      margin-bottom: 2px;
+      color: #333;
+    }
+
+    .user-status {
+      font-size: 0.8rem;
+      color: #6c757d;
+    }
+
+    /* Chat Messages */
+    .chat-messages {
+      display: flex;
+      flex-direction: column;
+      gap: 15px;
+      padding: 20px;
+      background: #f8f9fa;
+      border-radius: 15px;
+      max-height: 400px;
+      overflow-y: auto;
+    }
+
+    .chat-message {
+      display: flex;
+      flex-direction: column;
+      max-width: 75%;
+      animation: fadeIn 0.3s ease-in;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .chat-message.admin {
+      align-self: flex-end;
+      align-items: flex-end;
+    }
+
+    .chat-message.user {
+      align-self: flex-start;
+      align-items: flex-start;
+    }
+
+    .message-content {
+      padding: 12px 16px;
+      border-radius: 18px;
+      position: relative;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    }
+
+    .chat-message.admin .message-content {
+      background: linear-gradient(135deg, var(--primary-color), var(--accent-color));
+      color: white;
+      border-bottom-right-radius: 5px;
+    }
+
+    .chat-message.user .message-content {
+      background-color: white;
+      border: 1px solid #e9ecef;
+      border-bottom-left-radius: 5px;
+    }
+
+    .message-time {
+      font-size: 0.75rem;
+      margin-top: 4px;
+      opacity: 0.7;
+    }
+
+    .message-sender {
+      font-size: 0.8rem;
+      font-weight: 600;
+      margin-bottom: 4px;
+    }
+
+    .chat-message.admin .message-sender {
+      color: var(--primary-color);
+    }
+
+    .chat-message.user .message-sender {
+      color: #6c757d;
+    }
+
+    /* Chat Input */
+    .chat-input {
+      background: white;
+      padding: 15px;
+      border-radius: 15px;
+      box-shadow: 0 -2px 10px rgba(0,0,0,0.05);
+    }
+
+    .chat-input .input-group {
+      border-radius: 12px;
+      overflow: hidden;
+      border: 1px solid #e9ecef;
+    }
+
+    .chat-input .form-control {
+      border: none;
+      padding: 12px 15px;
+      font-size: 0.9rem;
+    }
+
+    .chat-input .form-control:focus {
+      box-shadow: none;
+    }
+
+    .chat-input .btn {
+      border-radius: 0;
+      padding: 12px 20px;
+    }
+
+    /* Ticket Status Badges */
+    .status-badge {
+      padding: 6px 12px;
+      border-radius: 20px;
+      font-weight: 500;
+      font-size: 0.8rem;
+    }
+
+    .status-pending {
+      background-color: #fff3cd;
+      color: #856404;
+    }
+
+    .status-on-process {
+      background-color: #d1ecf1;
+      color: #0c5460;
+    }
+
+    .status-processed {
+      background-color: #d4edda;
+      color: #155724;
+    }
+
+    /* Loading States */
+    .loading-spinner {
+      display: none;
+      text-align: center;
+      padding: 20px;
+    }
+
+    /* Stats Cards */
+    .stat-card {
+      border-radius: 15px;
+      color: white;
+      padding: 20px;
+      text-align: center;
+      transition: transform 0.3s ease;
+    }
+
+    .stat-card:hover {
+      transform: translateY(-5px);
+    }
+
+    .stat-card.total {
+      background: linear-gradient(135deg, #27ae60, #2ecc71);
+    }
+
+    .stat-card.pending {
+      background: linear-gradient(135deg, #ffe082, #ffca28);
+      color: #333;
+    }
+
+    .stat-card.on-process {
+      background: linear-gradient(135deg, #17a2b8, #20c997);
+    }
+
+    .stat-card.processed {
+      background: white;
+      color: var(--primary-color);
+      border: 2px solid var(--primary-color);
+    }
+
+    /* Modal Enhancements */
+    .modal-content {
+      border-radius: 20px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+      border: none;
+    }
+
+    .modal-header {
+      border-radius: 20px 20px 0 0;
+      padding: 15px 20px;
+    }
+
+    /* Print Styles */
+    @media print {
+      body * {
+        visibility: hidden;
+      }
+
+      #processedModal,
+      #processedModal * {
+        visibility: visible;
+      }
+
+      #processedModal {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 100%;
+        max-width: 100%;
+        margin: 0;
+        padding: 20px;
+        box-shadow: none;
+        border: none;
+      }
+
+      .modal-header,
+      .modal-footer {
+        display: none !important;
+      }
+
+      .modal-body {
+        padding: 0;
+        display: block !important;
+      }
+
+      #processedTableContainer {
+        max-height: none;
+        overflow: visible;
+      }
+
+      table {
+        width: 100% !important;
+        font-size: 12px;
+      }
+
+      th,
+      td {
+        padding: 8px 4px;
+        border: 1px solid #ddd !important;
+      }
+    }
+
+    /* Chart sizing tweaks */
+    #collegeChart, #issueChart {
+      width: 100% !important;
+      height: 260px !important;
+      max-height: 320px !important;
+    }
+
+    /* Responsive adjustments */
+    @media (max-width: 768px) {
+      .chat-message {
+        max-width: 85%;
+      }
+      
+      .stat-card {
+        margin-bottom: 15px;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <!-- Navbar -->
+  <nav class="navbar navbar-expand-lg navbar-dark px-4">
+    <a class="navbar-brand" href="#"><i class="fas fa-tachometer-alt me-2"></i>MISMO Admin</a>
+    <div class="ms-auto d-flex align-items-center gap-3">
+      <span class="text-white small d-none d-md-block">Admin Dashboard</span>
+      <button id="logoutBtn" class="btn btn-sm btn-light">
+        <i class="fas fa-sign-out-alt me-1"></i>Logout
+      </button>
+    </div>
+  </nav>
+
+  <!-- Dashboard -->
+  <div class="container-fluid py-4">
+    <div class="row mb-4">
+      <div class="col">
+        <h2 class="fw-bold text-success"><i class="fas fa-chart-line me-2"></i>Dashboard Overview</h2>
+        <p class="text-muted mb-0">Manage and track all submitted tickets efficiently</p>
+      </div>
+    </div>
+
+    <!-- Stats -->
+    <div class="row g-4">
+      <div class="col-md-3">
+        <div class="stat-card total">
+          <div class="card-body">
+            <i class="fas fa-ticket-alt fa-2x mb-3"></i>
+            <h5>Total Tickets</h5>
+            <h2 id="totalTickets">0</h2>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="stat-card pending">
+          <div class="card-body">
+            <i class="fas fa-clock fa-2x mb-3"></i>
+            <h5>Pending Tickets</h5>
+            <h2 id="pendingTickets">0</h2>
+            <button class="btn btn-warning btn-sm mt-2" id="viewPendingBtn">
+              <i class="fas fa-eye me-1"></i>View Pending
+            </button>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="stat-card on-process">
+          <div class="card-body">
+            <i class="fas fa-cogs fa-2x mb-3"></i>
+            <h5>On Process</h5>
+            <h2 id="onProcessTickets">0</h2>
+            <button class="btn btn-info btn-sm mt-2" id="viewOnProcessBtn">
+              <i class="fas fa-eye me-1"></i>View On Process
+            </button>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="stat-card processed">
+          <div class="card-body">
+            <i class="fas fa-check-circle fa-2x mb-3"></i>
+            <h5>Processed</h5>
+            <h2 id="processedCount">0</h2>
+            <button class="btn btn-success btn-sm mt-2" id="viewProcessedBtn">
+              <i class="fas fa-eye me-1"></i>View Processed
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Table and Sidebar -->
+    <div class="row mt-5 g-4">
+      <div class="col-md-8">
+        <div class="card p-3">
+          <div class="card-body">
+            <h5 class="fw-bold mb-3"><i class="fas fa-history me-2"></i>Recent Tickets</h5>
+            <div class="loading-spinner" id="recentTicketsLoading">
+              <div class="spinner-border text-success" role="status">
+                <span class="visually-hidden">Loading...</span>
+              </div>
+              <p class="mt-2">Loading recent tickets...</p>
+            </div>
+            <div class="table-responsive">
+              <table class="table table-hover align-middle">
+                <thead class="table-light">
+                  <tr>
+                    <th><i class="fas fa-hashtag me-1"></i>ID</th>
+                    <th><i class="fas fa-exclamation-circle me-1"></i>Issue</th>
+                    <th><i class="fas fa-tag me-1"></i>Status</th>
+                    <th><i class="fas fa-user me-1"></i>Submitted By</th>
+                    <th><i class="fas fa-cog me-1"></i>Action</th>
+                  </tr>
+                </thead>
+                <tbody id="recentTickets">
+                  <!-- Recent tickets will be populated from Firestore -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- User Conversations -->
+      <div class="col-md-4">
+        <div class="sidebar">
+          <h5 class="fw-bold mb-3 text-success">
+            <i class="fas fa-comments me-2"></i>User Conversations
+          </h5>
+          <div class="loading-spinner" id="usersLoading">
+            <div class="spinner-border text-success" role="status">
+              <span class="visually-hidden">Loading...</span>
+            </div>
+            <p class="mt-2">Loading users...</p>
+          </div>
+          <div id="usersList" class="users-list">
+            <!-- Users will be populated from Firestore -->
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Analytics Charts -->
+    <div class="row g-4 mt-4">
+      <div class="col-md-6">
+        <div class="card p-3">
+          <div class="card-body">
+            <h5 class="fw-bold mb-3"><i class="fas fa-university me-2"></i>Tickets by College / Department</h5>
+            <canvas id="collegeChart" height="160"></canvas>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-6">
+        <div class="card p-3">
+          <div class="card-body">
+            <h5 class="fw-bold mb-3"><i class="fas fa-chart-bar me-2"></i>Most Frequent Issues</h5>
+            <canvas id="issueChart" height="160"></canvas>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Chat Modal -->
+  <div class="modal fade" id="chatModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+      <div class="modal-content">
+        <div class="modal-header bg-success text-white">
+          <h5 class="modal-title">
+            <i class="fas fa-comment-dots me-2"></i>
+            Chat with <span id="chatUserName"></span>
+          </h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body p-0">
+          <div id="ticketInfo" class="p-3 bg-light border-bottom">
+            <!-- Ticket info will be shown here -->
+          </div>
+          <div class="chat-messages" id="chatMessages">
+            <div class="text-center text-muted py-5" id="noMessages">
+              <i class="fas fa-comments fa-3x mb-3"></i>
+              <p>No messages yet. Start the conversation!</p>
+            </div>
+          </div>
+          <div class="chat-input">
+            <div class="input-group">
+              <input type="text" class="form-control" id="messageInput" placeholder="Type your message...">
+              <button class="btn btn-success" id="sendMessage">
+                <i class="fas fa-paper-plane"></i>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Ticket View Modal -->
+  <div class="modal fade" id="ticketViewModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header bg-success text-white">
+          <h5 class="modal-title">Ticket Details</h5>
+          <button class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <p><strong>Ticket ID:</strong> <span id="ticketId"></span></p>
+          <p><strong>Issue:</strong> <span id="ticketIssue"></span></p>
+          <p><strong>Description:</strong> <span id="ticketDescription"></span></p>
+          <p><strong>School ID:</strong> <span id="ticketSchoolId"></span></p>
+          <p><strong>Department:</strong> <span id="ticketDepartment"></span></p>
+          <p><strong>Time Submitted:</strong> <span id="ticketTime"></span></p>
+          <div class="mb-2"><strong>Progress:</strong></div>
+          <div class="progress">
+            <div id="ticketProgress" class="progress-bar bg-success" role="progressbar"></div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-success" id="printTicketBtn">
+            <i class="fas fa-print me-1"></i>Print Ticket
+          </button>
+          <button class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Pending Tickets Modal -->
+  <div class="modal fade" id="pendingModal" tabindex="-1">
+    <div class="modal-dialog modal-xl modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header bg-warning text-white">
+          <h5 class="modal-title">
+            <i class="fas fa-clock me-2"></i>
+            Pending Tickets (<span id="pendingCountModal">0</span> Total)
+          </h5>
+          <button class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div class="loading-spinner" id="pendingLoadingSpinner">
+            <div class="spinner-border text-warning" role="status">
+              <span class="visually-hidden">Loading...</span>
+            </div>
+            <p class="mt-2">Loading pending tickets...</p>
+          </div>
+          <div id="pendingTableContainer">
+            <div class="table-responsive">
+              <table class="table table-hover align-middle" id="pendingTable">
+                <thead class="table-warning">
+                  <tr>
+                    <th>ID</th>
+                    <th>Issue</th>
+                    <th>Submitted By</th>
+                    <th>Department</th>
+                    <th>Time Submitted</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody id="pendingTicketsBody">
+                  <!-- Pending tickets will be populated from Firestore -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- On Process Tickets Modal -->
+  <div class="modal fade" id="onProcessModal" tabindex="-1">
+    <div class="modal-dialog modal-xl modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header bg-info text-white">
+          <h5 class="modal-title">
+            <i class="fas fa-cogs me-2"></i>
+            On Process Tickets (<span id="onProcessCountModal">0</span> Total)
+          </h5>
+          <button class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div class="loading-spinner" id="onProcessLoadingSpinner">
+            <div class="spinner-border text-info" role="status">
+              <span class="visually-hidden">Loading...</span>
+            </div>
+            <p class="mt-2">Loading on process tickets...</p>
+          </div>
+          <div id="onProcessTableContainer">
+            <div class="table-responsive">
+              <table class="table table-hover align-middle" id="onProcessTable">
+                <thead class="table-info">
+                  <tr>
+                    <th>ID</th>
+                    <th>Issue</th>
+                    <th>Submitted By</th>
+                    <th>Department</th>
+                    <th>Time Started</th>
+                    <th>Progress</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody id="onProcessTicketsBody">
+                  <!-- On Process tickets will be populated from Firestore -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Processed Tickets Modal -->
+  <div class="modal fade" id="processedModal" tabindex="-1">
+    <div class="modal-dialog modal-xl modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header bg-success text-white">
+          <h5 class="modal-title">
+            <i class="fas fa-check-circle me-2"></i>
+            Processed Tickets (<span id="processedCountModal">0</span> Total)
+          </h5>
+          <button class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div class="loading-spinner" id="loadingSpinner">
+            <div class="spinner-border text-success" role="status">
+              <span class="visually-hidden">Loading...</span>
+            </div>
+            <p class="mt-2">Loading processed tickets...</p>
+          </div>
+          <div id="processedTableContainer">
+            <div class="table-responsive">
+              <table class="table table-hover align-middle" id="processedTable">
+                <thead class="table-success">
+                  <tr>
+                    <th>ID</th>
+                    <th>Issue</th>
+                    <th>Submitted By</th>
+                    <th>Department</th>
+                    <th>Date Processed</th>
+                    <th>Remarks</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody id="processedTicketsBody">
+                  <!-- Processed tickets will be populated from Firestore -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-success" id="printProcessedBtn">
+            <i class="fas fa-print me-1"></i>Print Table
+          </button>
+          <button class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Remark Modal (Admin completes ticket with remarks) -->
+  <div class="modal fade" id="remarkModal" tabindex="-1" aria-labelledby="remarkModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="remarkModalLabel">Complete Ticket & Add Remarks</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <p>Ticket ID: <strong id="remarkTicketId"></strong></p>
+          <div class="mb-3">
+            <label for="remarkFound" class="form-label">Problem Found</label>
+            <textarea id="remarkFound" class="form-control" rows="3" placeholder="Describe the problem found..."></textarea>
+          </div>
+          <div class="mb-3">
+            <label for="remarkSolution" class="form-label">Solution Applied</label>
+            <textarea id="remarkSolution" class="form-control" rows="3" placeholder="Describe the solution applied..."></textarea>
+          </div>
+          <div class="mb-3">
+            <label for="remarkRecommendation" class="form-label">Recommendation</label>
+            <textarea id="remarkRecommendation" class="form-control" rows="2" placeholder="Any recommendations for the user..."></textarea>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="button" id="saveRemarkBtn" class="btn btn-primary">Save & Complete</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <script>
+    // Enhanced Admin Dashboard Functionality
+    let currentChatUser = null;
+    let messageListener = null;
+    let unreadListener = null;
+    let _collegeChart = null;
+    let _issueChart = null;
+
+    function initializeAdminDashboard() {
+      loadDashboardData();
+      setupEventListeners();
+    }
+
+    function setupEventListeners() {
+      // View buttons
+      document.getElementById("viewPendingBtn").addEventListener("click", () => {
+        loadPendingTickets();
+        const pendingModal = new bootstrap.Modal(document.getElementById("pendingModal"));
+        pendingModal.show();
+      });
+
+      document.getElementById("viewOnProcessBtn").addEventListener("click", () => {
+        loadOnProcessTickets();
+        const onProcessModal = new bootstrap.Modal(document.getElementById("onProcessModal"));
+        onProcessModal.show();
+      });
+
+      document.getElementById("viewProcessedBtn").addEventListener("click", () => {
+        loadProcessedTickets();
+        const processedModal = new bootstrap.Modal(document.getElementById("processedModal"));
+        processedModal.show();
+      });
+
+      // Print buttons
+      document.getElementById("printProcessedBtn").addEventListener("click", () => {
+        window.print();
+      });
+
+      document.getElementById("printTicketBtn").addEventListener("click", () => {
+        window.print();
+      });
+
+      // Chat functionality
+      document.getElementById('sendMessage').addEventListener('click', sendMessage);
+      document.getElementById('messageInput').addEventListener('keypress', (e) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+          e.preventDefault();
+          sendMessage();
+        }
+      });
+
+      // Logout
+      const adminLogoutBtn = document.getElementById('logoutBtn');
+      if (adminLogoutBtn) adminLogoutBtn.addEventListener('click', () => {
+        logout();
+      });
+
+      // Remark modal
+      const saveRemarkBtn = document.getElementById('saveRemarkBtn');
+      if (saveRemarkBtn) {
+        saveRemarkBtn.addEventListener('click', saveRemarks);
+      }
+    }
+
+    // Load all dashboard data from Firestore
+    function loadDashboardData() {
+      loadRecentTickets();
+      loadUsers();
+      loadTicketStats();
+    }
+
+    // Load recent tickets from Firestore
+    function loadRecentTickets() {
+      const recentTicketsBody = document.getElementById('recentTickets');
+      const loadingSpinner = document.getElementById('recentTicketsLoading');
+
+      loadingSpinner.style.display = 'block';
+
+      db.collection('tickets')
+        .orderBy('createdAt', 'desc')
+        .limit(10)
+        .onSnapshot((snapshot) => {
+          recentTicketsBody.innerHTML = '';
+
+          snapshot.forEach((doc) => {
+            const ticket = doc.data();
+            const statusBadge = getStatusBadge(ticket.status);
+
+            const row = document.createElement("tr");
+            row.innerHTML = `
+              <td>${ticket.id}</td>
+              <td>${ticket.issue}</td>
+              <td>${statusBadge}</td>
+              <td>${ticket.name || 'Unknown'}</td>
+              <td>
+                <button class="btn btn-outline-success btn-sm view-ticket-btn" 
+                        data-ticket='${JSON.stringify(ticket).replace(/'/g, "&#39;")}'>
+                  <i class="fas fa-eye me-1"></i>View
+                </button>
+              </td>
+            `;
+            recentTicketsBody.appendChild(row);
+          });
+
+          attachViewTicketListeners();
+          loadingSpinner.style.display = 'none';
+        }, (error) => {
+          console.error('Error loading recent tickets:', error);
+          loadingSpinner.style.display = 'none';
+        });
+    }
+
+    // Load users with tickets and chat functionality
+    async function loadUsers() {
+      const usersList = document.getElementById('usersList');
+      const loadingSpinner = document.getElementById('usersLoading');
+
+      loadingSpinner.style.display = 'block';
+
+      try {
+        const ticketsSnapshot = await db.collection('tickets').get();
+        const userIds = new Set();
+        const ticketsByUser = {};
+        const userNames = {};
+        
+        ticketsSnapshot.forEach(doc => {
+          const ticket = doc.data();
+          if (ticket.userId || ticket.userEmail) {
+            const userId = ticket.userId || ticket.userEmail;
+            userIds.add(userId);
+            if (!ticketsByUser[userId]) {
+              ticketsByUser[userId] = [];
+            }
+            ticketsByUser[userId].push({...ticket, id: doc.id});
+            userNames[userId] = ticket.name || 'Unknown User';
+          }
+        });
+
+        usersList.innerHTML = '';
+
+        for (const userId of userIds) {
+          const userTickets = ticketsByUser[userId] || [];
+          const userName = userNames[userId];
+          
+          const userElement = document.createElement("div");
+          userElement.className = "chat-user";
+          userElement.dataset.userId = userId;
+          
+          userElement.innerHTML = `
+            <img src="https://ui-avatars.com/api/?name=${encodeURIComponent(userName)}&background=28a745&color=fff" 
+                 class="user-avatar" alt="${userName}">
+            <div class="user-info">
+              <div class="user-name">${userName}</div>
+              <div class="user-status">${userTickets.length} active ticket(s)</div>
+            </div>
+            <div class="unread-badge d-none">0</div>
+          `;
+
+          const userInfo = {
+            id: userId,
+            name: userName,
+            tickets: userTickets
+          };
+          
+          userElement.addEventListener('click', () => openChat(userId, userInfo));
+          usersList.appendChild(userElement);
+        }
+
+        if (usersList.children.length === 0) {
+          usersList.innerHTML = '<p class="text-center text-muted p-3">No users with tickets found</p>';
+        }
+
+        monitorUnreadMessages();
+      } catch (error) {
+        console.error("Error loading users:", error);
+        usersList.innerHTML = '<p class="text-center text-danger p-3">Error loading users</p>';
+      } finally {
+        loadingSpinner.style.display = 'none';
+      }
+    }
+
+    // Monitor unread messages for badge indicators
+    function monitorUnreadMessages() {
+      if (unreadListener) unreadListener();
+      
+      unreadListener = db.collection('chats')
+        .where('readByAdmin', '==', false)
+        .onSnapshot(snapshot => {
+          const unreadByUser = {};
+          snapshot.forEach(doc => {
+            const message = doc.data();
+            if (message.senderId !== firebase.auth().currentUser.uid) {
+              if (!unreadByUser[message.conversationId]) {
+                unreadByUser[message.conversationId] = 0;
+              }
+              unreadByUser[message.conversationId]++;
+            }
+          });
+
+          document.querySelectorAll('.chat-user').forEach(item => {
+            const userId = item.dataset.userId;
+            const badge = item.querySelector('.unread-badge');
+            if (unreadByUser[userId]) {
+              badge.classList.remove('d-none');
+              badge.textContent = unreadByUser[userId];
+            } else {
+              badge.classList.add('d-none');
+            }
+          });
+        });
+    }
+
+    // Open chat with a user
+    async function openChat(userId, userData) {
+      currentChatUser = userId;
+      const chatUserName = document.getElementById('chatUserName');
+      const ticketInfo = document.getElementById('ticketInfo');
+      const chatMessages = document.getElementById('chatMessages');
+      
+      chatUserName.textContent = userData.name;
+      
+      // Display user's tickets
+      ticketInfo.innerHTML = `
+        <div class="d-flex justify-content-between align-items-center">
+          <div>
+            <h6 class="mb-1">${userData.name}'s Active Tickets</h6>
+            <div class="d-flex flex-wrap gap-2 mt-2">
+              ${userData.tickets.map(ticket => `
+                <span class="status-badge ${getStatusBadgeClass(ticket.status)}">
+                  ${ticket.issue} (${ticket.id})
+                </span>
+              `).join('')}
+            </div>
+          </div>
+          <span class="badge bg-primary">${userData.tickets.length} tickets</span>
+        </div>
+      `;
+
+      // Clear previous listener
+      if (messageListener) {
+        messageListener();
+      }
+
+      messageListener = db.collection('chats')
+        .where('conversationId', '==', userId)
+        .orderBy('timestamp', 'asc')
+        .onSnapshot((snapshot) => {
+          chatMessages.innerHTML = '';
+          
+          const messages = [];
+          snapshot.forEach((doc) => {
+            const message = doc.data();
+            messages.push({
+              ...message,
+              id: doc.id,
+              timestamp: message.timestamp?.toDate() || new Date()
+            });
+          });
+
+          // Mark messages as read for admin
+          const batch = db.batch();
+          messages.forEach(msg => {
+            if (!msg.readByAdmin && msg.senderId !== firebase.auth().currentUser.uid) {
+              batch.update(db.collection('chats').doc(msg.id), { 
+                readByAdmin: true,
+                readAt: firebase.firestore.FieldValue.serverTimestamp()
+              });
+            }
+          });
+          if (messages.length > 0) {
+            batch.commit();
+          }
+
+          // Display messages
+          if (messages.length === 0) {
+            document.getElementById('noMessages').style.display = 'block';
+          } else {
+            document.getElementById('noMessages').style.display = 'none';
+            messages.forEach((message) => {
+              const messageElem = document.createElement('div');
+              const isAdmin = message.senderId === firebase.auth().currentUser.uid;
+              messageElem.className = `chat-message ${isAdmin ? 'admin' : 'user'}`;
+              messageElem.innerHTML = `
+                <div class="message-sender">${isAdmin ? 'You' : (message.senderName || 'User')}</div>
+                <div class="message-content">
+                  ${message.text}
+                </div>
+                <div class="message-time">${message.timestamp.toLocaleString()}</div>
+              `;
+              chatMessages.appendChild(messageElem);
+            });
+          }
+
+          chatMessages.scrollTop = chatMessages.scrollHeight;
+        });
+
+      const chatModal = new bootstrap.Modal(document.getElementById('chatModal'));
+      chatModal.show();
+
+      setTimeout(() => {
+        document.getElementById('messageInput').focus();
+      }, 500);
+
+      document.getElementById('chatModal').addEventListener('hidden.bs.modal', () => {
+        if (messageListener) {
+          messageListener();
+          messageListener = null;
+        }
+        currentChatUser = null;
+        
+        // Remove active state from all users
+        document.querySelectorAll('.chat-user').forEach(user => {
+          user.classList.remove('active');
+        });
+      });
+
+      // Add active state to clicked user
+      document.querySelectorAll('.chat-user').forEach(user => {
+        user.classList.remove('active');
+        if (user.dataset.userId === userId) {
+          user.classList.add('active');
+        }
+      });
+    }
+
+    // Send message handler
+    async function sendMessage() {
+      const messageInput = document.getElementById('messageInput');
+      const message = messageInput.value.trim();
+      
+      if (message && currentChatUser) {
+        try {
+          await db.collection('chats').add({
+            conversationId: currentChatUser,
+            text: message,
+            senderId: firebase.auth().currentUser.uid,
+            senderName: 'Admin',
+            timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+            readByUser: false,
+            readByAdmin: true
+          });
+          
+          messageInput.value = '';
+        } catch (error) {
+          console.error('Error sending message:', error);
+          alert('Failed to send message');
+        }
+      }
+    }
+
+    // Helper functions
+    function getStatusBadge(status) {
+      const statusConfig = {
+        'pending': { class: 'status-badge status-pending', text: 'Pending' },
+        'on-process': { class: 'status-badge status-on-process', text: 'On Process' },
+        'processed': { class: 'status-badge status-processed', text: 'Processed' },
+        'Pending': { class: 'status-badge status-pending', text: 'Pending' },
+        'On Process': { class: 'status-badge status-on-process', text: 'On Process' },
+        'Processed': { class: 'status-badge status-processed', text: 'Processed' }
+      };
+
+      const config = statusConfig[status] || { class: 'badge bg-secondary', text: status };
+      return `<span class="${config.class}">${config.text}</span>`;
+    }
+
+    function getStatusBadgeClass(status) {
+      const statusMap = {
+        'pending': 'status-pending',
+        'on-process': 'status-on-process',
+        'processed': 'status-processed',
+        'Pending': 'status-pending',
+        'On Process': 'status-on-process',
+        'Processed': 'status-processed'
+      };
+      return statusMap[status] || 'bg-secondary';
+    }
+
+    // Load ticket statistics from Firestore
+    function loadTicketStats() {
+      db.collection('tickets')
+        .onSnapshot((snapshot) => {
+          let total = 0;
+          let pending = 0;
+          let onProcess = 0;
+          let processed = 0;
+          const collegeCounts = {};
+          const issueCounts = {};
+
+          snapshot.forEach((doc) => {
+            const ticket = doc.data();
+            total++;
+
+            // aggregate by college/department
+            const dept = ticket.department || 'Unknown';
+            collegeCounts[dept] = (collegeCounts[dept] || 0) + 1;
+
+            // aggregate by issue
+            const iss = ticket.issue || 'Other';
+            issueCounts[iss] = (issueCounts[iss] || 0) + 1;
+
+            if (ticket.status === 'Pending' || ticket.status === 'pending') {
+              pending++;
+            } else if (ticket.status === 'On Process' || ticket.status === 'on-process') {
+              onProcess++;
+            } else if (ticket.status === 'Processed' || ticket.status === 'processed') {
+              processed++;
+            }
+          });
+
+          // Update statistics
+          document.getElementById('totalTickets').textContent = total;
+          document.getElementById('pendingTickets').textContent = pending;
+          document.getElementById('onProcessTickets').textContent = onProcess;
+          document.getElementById('processedCount').textContent = processed;
+
+          // render analytics charts
+          try {
+            renderCollegeChart(collegeCounts);
+            renderIssueChart(issueCounts);
+          } catch (err) {
+            console.warn('Chart rendering failed:', err);
+          }
+        }, (error) => {
+          console.error("Error loading ticket stats:", error);
+        });
+    }
+
+    // Charts
+    function renderCollegeChart(counts) {
+      try {
+        const chartCanvas = document.getElementById('collegeChart');
+        if (!chartCanvas) return;
+        
+        const ctx = chartCanvas.getContext('2d');
+        const labels = Object.keys(counts).sort((a,b) => counts[b]-counts[a]);
+        const data = labels.map(l => counts[l]);
+
+        if (labels.length === 0) {
+          labels.push('No Data');
+          data.push(0);
+        }
+
+        if (_collegeChart) {
+          _collegeChart.data.labels = labels;
+          _collegeChart.data.datasets[0].data = data;
+          _collegeChart.update();
+          return;
+        }
+
+        _collegeChart = new Chart(ctx, {
+          type: 'bar',
+          data: {
+            labels: labels,
+            datasets: [{
+              label: 'Tickets',
+              data: data,
+              backgroundColor: '#2ecc71'
+            }]
+          },
+          options: {
+            indexAxis: 'y',
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            scales: {
+              x: { beginAtZero: true, ticks: { precision:0 } },
+              y: { ticks: { autoSkip: false } }
+            }
+          }
+        });
+      } catch (err) {
+        console.error('Error rendering college chart:', err);
+      }
+    }
+
+    function renderIssueChart(counts) {
+      try {
+        const chartCanvas = document.getElementById('issueChart');
+        if (!chartCanvas) return;
+
+        const ctx = chartCanvas.getContext('2d');
+        const labels = Object.keys(counts).sort((a,b) => counts[b]-counts[a]).slice(0,10);
+        const data = labels.map(l => counts[l]);
+
+        if (labels.length === 0) {
+          labels.push('No Data');
+          data.push(0);
+        }
+
+        if (_issueChart) {
+          _issueChart.data.labels = labels;
+          _issueChart.data.datasets[0].data = data;
+          _issueChart.update();
+          return;
+        }
+        _issueChart = new Chart(ctx, {
+          type: 'bar',
+          data: {
+            labels: labels,
+            datasets: [{
+              label: 'Occurrences',
+              data: data,
+              backgroundColor: '#17a2b8'
+            }]
+          },
+          options: {
+            indexAxis: 'y',
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            scales: {
+              x: { beginAtZero: true, ticks: { precision:0 } },
+              y: { ticks: { autoSkip: false } }
+            }
+          }
+        });
+      } catch (err) {
+        console.error('Error rendering issue chart:', err);
+      }
+    }
+
+    // Attach view ticket listeners
+    function attachViewTicketListeners() {
+      document.querySelectorAll(".view-ticket-btn").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          const ticketData = JSON.parse(btn.dataset.ticket.replace(/&#39;/g, "'"));
+
+          document.getElementById("ticketId").textContent = ticketData.id;
+          document.getElementById("ticketIssue").textContent = ticketData.issue;
+          document.getElementById("ticketDescription").textContent = ticketData.description || 'No description available';
+          document.getElementById("ticketSchoolId").textContent = ticketData.schoolId || 'N/A';
+          document.getElementById("ticketDepartment").textContent = ticketData.department || 'N/A';
+          document.getElementById("ticketTime").textContent = ticketData.createdAt ?
+            new Date(ticketData.createdAt.seconds * 1000).toLocaleString() : 'N/A';
+
+          const progress = ticketData.progress || 0;
+          document.getElementById("ticketProgress").style.width = progress + "%";
+          document.getElementById("ticketProgress").textContent = progress + "%";
+
+          const ticketModal = new bootstrap.Modal(document.getElementById("ticketViewModal"));
+          ticketModal.show();
+        });
+      });
+    }
+
+    // Load pending tickets from Firestore
+    function loadPendingTickets() {
+      const pendingTicketsBody = document.getElementById('pendingTicketsBody');
+      const loadingSpinner = document.getElementById('pendingLoadingSpinner');
+      const pendingTableContainer = document.getElementById('pendingTableContainer');
+
+      loadingSpinner.style.display = 'block';
+      pendingTableContainer.style.display = 'none';
+
+      db.collection('tickets')
+        .orderBy('createdAt', 'desc')
+        .onSnapshot((snapshot) => {
+          pendingTicketsBody.innerHTML = '';
+          let count = 0;
+
+          snapshot.forEach((doc) => {
+            const ticket = doc.data();
+            if (ticket.status === 'Pending' || ticket.status === 'pending') {
+              const row = document.createElement("tr");
+              row.innerHTML = `
+                <td>${ticket.id}</td>
+                <td>${ticket.issue}</td>
+                <td>${ticket.name || 'Unknown'}</td>
+                <td>${ticket.department}</td>
+                <td>${ticket.time || 'N/A'}</td>
+                <td>
+                  <button class="btn btn-success btn-sm process-ticket-btn" data-doc-id="${doc.id}">
+                    Process This
+                  </button>
+                </td>
+              `;
+              pendingTicketsBody.appendChild(row);
+              count++;
+            }
+          });
+
+          if (count === 0) {
+            pendingTicketsBody.innerHTML = '<tr><td colspan="6" class="text-center">No pending tickets found</td></tr>';
+          }
+
+          document.getElementById('pendingCountModal').textContent = count;
+          loadingSpinner.style.display = 'none';
+          pendingTableContainer.style.display = 'block';
+          attachProcessTicketListeners();
+        }, (error) => {
+          console.error("Error loading pending tickets:", error);
+          loadPendingTicketsAlternative();
+        });
+    }
+
+    function loadPendingTicketsAlternative() {
+      const pendingTicketsBody = document.getElementById('pendingTicketsBody');
+      const loadingSpinner = document.getElementById('pendingLoadingSpinner');
+      const pendingTableContainer = document.getElementById('pendingTableContainer');
+
+      db.collection('tickets')
+        .get()
+        .then((snapshot) => {
+          pendingTicketsBody.innerHTML = '';
+          let count = 0;
+          const tickets = [];
+
+          snapshot.forEach((doc) => {
+            const ticket = doc.data();
+            if (ticket.status === 'Pending' || ticket.status === 'pending') {
+              tickets.push({...ticket, docId: doc.id});
+            }
+          });
+
+          tickets.sort((a, b) => {
+            if (a.createdAt && b.createdAt) {
+              return b.createdAt.seconds - a.createdAt.seconds;
+            }
+            return 0;
+          });
+
+          tickets.forEach(ticket => {
+            const row = document.createElement("tr");
+            row.innerHTML = `
+              <td>${ticket.id}</td>
+              <td>${ticket.issue}</td>
+              <td>${ticket.name || 'Unknown'}</td>
+              <td>${ticket.department}</td>
+              <td>${ticket.time || 'N/A'}</td>
+              <td>
+                <button class="btn btn-success btn-sm process-ticket-btn" data-doc-id="${ticket.docId}">
+                  Process This
+                </button>
+              </td>
+            `;
+            pendingTicketsBody.appendChild(row);
+            count++;
+          });
+
+          if (count === 0) {
+            pendingTicketsBody.innerHTML = '<tr><td colspan="6" class="text-center">No pending tickets found</td></tr>';
+          }
+
+          document.getElementById('pendingCountModal').textContent = count;
+          loadingSpinner.style.display = 'none';
+          pendingTableContainer.style.display = 'block';
+          attachProcessTicketListeners();
+        })
+        .catch((error) => {
+          console.error("Error loading pending tickets (alternative):", error);
+          pendingTicketsBody.innerHTML = '<tr><td colspan="6" class="text-center text-danger">Error loading tickets</td></tr>';
+          loadingSpinner.style.display = 'none';
+          pendingTableContainer.style.display = 'block';
+        });
+    }
+
+    // Load on process tickets from Firestore
+    function loadOnProcessTickets() {
+      const onProcessTicketsBody = document.getElementById('onProcessTicketsBody');
+      const loadingSpinner = document.getElementById('onProcessLoadingSpinner');
+      const onProcessTableContainer = document.getElementById('onProcessTableContainer');
+
+      loadingSpinner.style.display = 'block';
+      onProcessTableContainer.style.display = 'none';
+
+      db.collection('tickets')
+        .orderBy('createdAt', 'desc')
+        .onSnapshot((snapshot) => {
+          onProcessTicketsBody.innerHTML = '';
+          let count = 0;
+
+          snapshot.forEach((doc) => {
+            const ticket = doc.data();
+            if (ticket.status === 'On Process' || ticket.status === 'on-process') {
+              const row = document.createElement("tr");
+              row.innerHTML = `
+                <td>${ticket.id}</td>
+                <td>${ticket.issue}</td>
+                <td>${ticket.name || 'Unknown'}</td>
+                <td>${ticket.department}</td>
+                <td>${ticket.time || 'N/A'}</td>
+                <td>
+                  <div class="progress" style="height: 20px;">
+                    <div class="progress-bar ${getProgressColor(ticket.progress)}" role="progressbar" 
+                         style="width: ${ticket.progress || 0}%">
+                      ${ticket.progress || 0}%
+                    </div>
+                  </div>
+                </td>
+                <td>
+                  <button class="btn btn-success btn-sm complete-ticket-btn" data-doc-id="${doc.id}">
+                    Done
+                  </button>
+                </td>
+              `;
+              onProcessTicketsBody.appendChild(row);
+              count++;
+            }
+          });
+
+          if (count === 0) {
+            onProcessTicketsBody.innerHTML = '<tr><td colspan="7" class="text-center">No on process tickets found</td></tr>';
+          }
+
+          document.getElementById('onProcessCountModal').textContent = count;
+          loadingSpinner.style.display = 'none';
+          onProcessTableContainer.style.display = 'block';
+          attachCompleteTicketListeners();
+        }, (error) => {
+          console.error("Error loading on process tickets:", error);
+          loadOnProcessTicketsAlternative();
+        });
+    }
+
+    function loadOnProcessTicketsAlternative() {
+      const onProcessTicketsBody = document.getElementById('onProcessTicketsBody');
+      const loadingSpinner = document.getElementById('onProcessLoadingSpinner');
+      const onProcessTableContainer = document.getElementById('onProcessTableContainer');
+
+      db.collection('tickets')
+        .get()
+        .then((snapshot) => {
+          onProcessTicketsBody.innerHTML = '';
+          let count = 0;
+          const tickets = [];
+
+          snapshot.forEach((doc) => {
+            const ticket = doc.data();
+            if (ticket.status === 'On Process' || ticket.status === 'on-process') {
+              tickets.push({...ticket, docId: doc.id});
+            }
+          });
+
+          tickets.sort((a, b) => {
+            if (a.time && b.time) {
+              return new Date(b.time) - new Date(a.time);
+            }
+            return 0;
+          });
+
+          tickets.forEach(ticket => {
+            const row = document.createElement("tr");
+            row.innerHTML = `
+              <td>${ticket.id}</td>
+              <td>${ticket.issue}</td>
+              <td>${ticket.name || 'Unknown'}</td>
+              <td>${ticket.department}</td>
+              <td>${ticket.time || 'N/A'}</td>
+              <td>
+                <div class="progress" style="height: 20px;">
+                  <div class="progress-bar ${getProgressColor(ticket.progress)}" role="progressbar" 
+                       style="width: ${ticket.progress || 0}%">
+                    ${ticket.progress || 0}%
+                  </div>
+                </div>
+              </td>
+              <td>
+                <button class="btn btn-success btn-sm complete-ticket-btn" data-doc-id="${ticket.docId}">
+                  Done
+                </button>
+              </td>
+            `;
+            onProcessTicketsBody.appendChild(row);
+            count++;
+          });
+
+          if (count === 0) {
+            onProcessTicketsBody.innerHTML = '<tr><td colspan="7" class="text-center">No on process tickets found</td></tr>';
+          }
+
+          document.getElementById('onProcessCountModal').textContent = count;
+          loadingSpinner.style.display = 'none';
+          onProcessTableContainer.style.display = 'block';
+          attachCompleteTicketListeners();
+        })
+        .catch((error) => {
+          console.error("Error loading on process tickets (alternative):", error);
+          onProcessTicketsBody.innerHTML = '<tr><td colspan="7" class="text-center text-danger">Error loading tickets</td></tr>';
+          loadingSpinner.style.display = 'none';
+          onProcessTableContainer.style.display = 'block';
+        });
+    }
+
+    // Load processed tickets from Firestore
+    function loadProcessedTickets() {
+      const processedTicketsBody = document.getElementById('processedTicketsBody');
+      const loadingSpinner = document.getElementById('loadingSpinner');
+      const processedTableContainer = document.getElementById('processedTableContainer');
+
+      loadingSpinner.style.display = 'block';
+      processedTableContainer.style.display = 'none';
+
+      db.collection('tickets')
+        .orderBy('createdAt', 'desc')
+        .onSnapshot((snapshot) => {
+          processedTicketsBody.innerHTML = '';
+          let count = 0;
+
+          snapshot.forEach((doc) => {
+            const ticket = doc.data();
+            if (ticket.status === 'Processed' || ticket.status === 'processed') {
+              const remarkSnippet = ticket.remarks ? (ticket.remarks.found || ticket.remarks.solution || ticket.remarks.recommendation || '') : '';
+              const shortRemark = remarkSnippet.length > 80 ? remarkSnippet.substring(0,80) + '…' : remarkSnippet;
+              const row = document.createElement("tr");
+              row.innerHTML = `
+                <td>${ticket.id}</td>
+                <td>${ticket.issue}</td>
+                <td>${ticket.name || 'Unknown'}</td>
+                <td>${ticket.department}</td>
+                <td>${ticket.dateProcessed || new Date().toLocaleDateString()}</td>
+                <td>${shortRemark}</td>
+                <td>
+                  <button class="btn btn-sm btn-outline-primary processed-view-btn" data-doc-id="${doc.id}">View</button>
+                </td>
+              `;
+              processedTicketsBody.appendChild(row);
+              count++;
+            }
+          });
+
+          if (count === 0) {
+            processedTicketsBody.innerHTML = '<tr><td colspan="6" class="text-center">No processed tickets found</td></tr>';
+          }
+
+          attachProcessedViewListeners();
+          document.getElementById('processedCount').textContent = count;
+          document.getElementById('processedCountModal').textContent = count;
+          loadingSpinner.style.display = 'none';
+          processedTableContainer.style.display = 'block';
+        }, (error) => {
+          console.error("Error loading processed tickets:", error);
+          loadProcessedTicketsAlternative();
+        });
+    }
+
+    function loadProcessedTicketsAlternative() {
+      const processedTicketsBody = document.getElementById('processedTicketsBody');
+      const loadingSpinner = document.getElementById('loadingSpinner');
+      const processedTableContainer = document.getElementById('processedTableContainer');
+
+      db.collection('tickets')
+        .get()
+        .then((snapshot) => {
+          processedTicketsBody.innerHTML = '';
+          let count = 0;
+          const tickets = [];
+
+          snapshot.forEach((doc) => {
+            const ticket = doc.data();
+            if (ticket.status === 'Processed' || ticket.status === 'processed') {
+              tickets.push(Object.assign({}, ticket, { __docId: doc.id }));
+            }
+          });
+
+          tickets.sort((a, b) => {
+            if (a.time && b.time) {
+              return new Date(b.time) - new Date(a.time);
+            }
+            return 0;
+          });
+
+          tickets.forEach(ticket => {
+            const remarkSnippet = ticket.remarks ? (ticket.remarks.found || ticket.remarks.solution || ticket.remarks.recommendation || '') : '';
+            const shortRemark = remarkSnippet.length > 80 ? remarkSnippet.substring(0,80) + '…' : remarkSnippet;
+            const row = document.createElement("tr");
+            row.innerHTML = `
+              <td>${ticket.id}</td>
+              <td>${ticket.issue}</td>
+              <td>${ticket.name || 'Unknown'}</td>
+              <td>${ticket.department}</td>
+              <td>${ticket.dateProcessed || new Date().toLocaleDateString()}</td>
+              <td>${shortRemark}</td>
+              <td>
+                <button class="btn btn-sm btn-outline-primary processed-view-btn" data-doc-id="${ticket.__docId || ''}">View</button>
+              </td>
+            `;
+            processedTicketsBody.appendChild(row);
+            count++;
+          });
+
+          if (count === 0) {
+            processedTicketsBody.innerHTML = '<tr><td colspan="6" class="text-center">No processed tickets found</td></tr>';
+          }
+
+          attachProcessedViewListeners();
+          document.getElementById('processedCount').textContent = count;
+          document.getElementById('processedCountModal').textContent = count;
+          loadingSpinner.style.display = 'none';
+          processedTableContainer.style.display = 'block';
+        })
+        .catch((error) => {
+          console.error("Error loading processed tickets (alternative):", error);
+          processedTicketsBody.innerHTML = '<tr><td colspan="5" class="text-center text-danger">Error loading tickets</td></tr>';
+          loadingSpinner.style.display = 'none';
+          processedTableContainer.style.display = 'block';
+        });
+    }
+
+    // Process ticket - move from pending to on process
+    async function processTicket(docId) {
+      try {
+        await db.collection('tickets').doc(docId).update({
+          status: 'on-process',
+          progress: 50
+        });
+        showNotification('Ticket moved to On Process', 'success');
+      } catch (error) {
+        console.error('Error processing ticket:', error);
+        showNotification('Error processing ticket', 'error');
+      }
+    }
+
+    // Complete ticket - move from on process to processed
+    async function completeTicket(docId) {
+      try {
+        const doc = await db.collection('tickets').doc(docId).get();
+        const ticket = doc.data();
+        
+        document.getElementById('remarkTicketId').textContent = ticket.id || '';
+        document.getElementById('remarkFound').value = ticket.remarks ? (ticket.remarks.found || '') : '';
+        document.getElementById('remarkSolution').value = ticket.remarks ? (ticket.remarks.solution || '') : '';
+        document.getElementById('remarkRecommendation').value = ticket.remarks ? (ticket.remarks.recommendation || '') : '';
+        
+        document.getElementById('saveRemarkBtn').dataset.docId = docId;
+        
+        const remarkModal = new bootstrap.Modal(document.getElementById('remarkModal'));
+        remarkModal.show();
+      } catch (error) {
+        console.error('Error opening remark modal:', error);
+        showNotification('Error opening remark modal', 'error');
+      }
+    }
+
+    // Attach process ticket event listeners
+    function attachProcessTicketListeners() {
+      document.querySelectorAll('.process-ticket-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          const docId = e.target.dataset.docId;
+          processTicket(docId);
+        });
+      });
+    }
+
+    // Attach complete ticket event listeners
+    function attachCompleteTicketListeners() {
+      document.querySelectorAll('.complete-ticket-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          const docId = e.target.dataset.docId;
+          completeTicket(docId);
+        });
+      });
+    }
+
+    // Attach view listeners for processed table
+    function attachProcessedViewListeners() {
+      document.querySelectorAll('.processed-view-btn').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+          const docId = e.target.dataset.docId;
+          try {
+            const snap = await db.collection('tickets').doc(docId).get();
+            const ticket = snap.data();
+            if (!ticket) return alert('Ticket not found');
+
+            const ticketData = ticket;
+            ticketData.createdAt = ticket.createdAt || null;
+            
+            const ticketModal = new bootstrap.Modal(document.getElementById('ticketViewModal'));
+            document.getElementById('ticketId').textContent = ticketData.id;
+            document.getElementById('ticketIssue').textContent = ticketData.issue;
+            document.getElementById('ticketDescription').textContent = ticketData.description || 'No description available';
+            document.getElementById('ticketSchoolId').textContent = ticketData.schoolId || 'N/A';
+            document.getElementById('ticketDepartment').textContent = ticketData.department || 'N/A';
+            document.getElementById('ticketTime').textContent = ticketData.createdAt ? (ticketData.createdAt.toDate ? ticketData.createdAt.toDate().toLocaleString() : ticketData.createdAt) : (ticketData.time || 'N/A');
+
+            const progress = ticketData.progress || 0;
+            document.getElementById('ticketProgress').style.width = progress + "%";
+            document.getElementById('ticketProgress').textContent = progress + "%";
+
+            ticketModal.show();
+          } catch (err) {
+            console.error('Error fetching ticket for view:', err);
+            showNotification('Failed to load ticket details', 'error');
+          }
+        });
+      });
+    }
+
+    function getProgressColor(p) {
+      if (p >= 100) return 'bg-success';
+      if (p >= 60) return 'bg-info';
+      return 'bg-warning';
+    }
+
+    // Save remarks function
+    async function saveRemarks() {
+      const docId = document.getElementById('saveRemarkBtn').dataset.docId;
+      if (!docId) return showNotification('No ticket selected', 'error');
+
+      const found = document.getElementById('remarkFound').value.trim();
+      const solution = document.getElementById('remarkSolution').value.trim();
+      const recommendation = document.getElementById('remarkRecommendation').value.trim();
+
+      try {
+        await db.collection('tickets').doc(docId).update({
+          status: 'processed',
+          progress: 100,
+          finishedAt: firebase.firestore.FieldValue.serverTimestamp(),
+          remarks: {
+            found: found,
+            solution: solution,
+            recommendation: recommendation,
+            by: (firebase.auth().currentUser && firebase.auth().currentUser.uid) || null,
+            at: firebase.firestore.FieldValue.serverTimestamp()
+          }
+        });
+
+        // Create notification for user
+        const ticketSnap = await db.collection('tickets').doc(docId).get();
+        const ticket = ticketSnap.data();
+        if (ticket && ticket.userId) {
+          await db.collection('notifications').add({
+            userId: ticket.userId,
+            ticketId: docId,
+            message: `Your ticket (${ticket.id || docId}) has been completed by admin.`,
+            createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+            read: false
+          });
+        }
+
+        const remarkModal = bootstrap.Modal.getInstance(document.getElementById('remarkModal'));
+        remarkModal.hide();
+        
+        showNotification('Ticket completed successfully!', 'success');
+      } catch (err) {
+        console.error('Error saving remarks:', err);
+        showNotification('Failed to save remarks', 'error');
+      }
+    }
+
+    // Utility function to show notifications
+    function showNotification(message, type = 'info') {
+      const alertClass = type === 'success' ? 'alert-success' : 
+                        type === 'error' ? 'alert-danger' : 
+                        type === 'warning' ? 'alert-warning' : 'alert-info';
+      
+      const notification = document.createElement('div');
+      notification.className = `alert ${alertClass} alert-dismissible fade show position-fixed`;
+      notification.style.cssText = 'top: 20px; right: 20px; z-index: 9999; min-width: 300px;';
+      notification.innerHTML = `
+        ${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+      `;
+      
+      document.body.appendChild(notification);
+      
+      setTimeout(() => {
+        if (notification.parentNode) {
+          notification.remove();
+        }
+      }, 5000);
+    }
+
+    // Initialize remark modal
+    const remarkModal = new bootstrap.Modal(document.getElementById('remarkModal'));
+  </script>
+</body>
+</html>
