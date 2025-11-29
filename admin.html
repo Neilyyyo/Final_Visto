@@ -18,6 +18,9 @@
     <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore-compat.js"></script>
+    
+    <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
+    
     <script src="js/auth.js"></script>
 
     <script>
@@ -34,6 +37,12 @@
 
       firebase.initializeApp(firebaseConfig);
       const db = firebase.firestore();
+
+      // 2. INITIALIZE EMAILJS
+      (function() {
+          // REPLACE WITH YOUR ACTUAL PUBLIC KEY
+          emailjs.init("-MLS89N-SQ0aUPGNk"); 
+      })();
 
       // --- SESSION SECURITY CHECK ---
       firebase.auth().onAuthStateChanged((user) => {
@@ -1618,6 +1627,27 @@
         return "bg-warning";
       }
 
+      // 3. SEND NOTIFICATION FUNCTION
+      async function sendCompletionEmail(ticket, remarks) {
+        // Must match variables in your EmailJS Template
+        const templateParams = {
+            to_email: ticket.userEmail,
+            to_name: ticket.name,
+            ticket_id: ticket.id,
+            issue: ticket.issue,
+            solution: remarks.solution,
+            recommendation: remarks.recommendation
+        };
+
+        try {
+            // REPLACE WITH YOUR SERVICE ID AND TEMPLATE ID (Create a "Ticket Done" template)
+            await emailjs.send("service_4v7dh2w", "template_7l423ae", templateParams);
+            console.log("Completion email sent successfully!");
+        } catch (error) {
+            console.error("EmailJS Error:", error);
+        }
+      }
+
       async function saveRemarks() {
         const docId = document.getElementById("saveRemarkBtn").dataset.docId;
         if (!docId) return showNotification("No ticket selected", "error");
@@ -1644,8 +1674,16 @@
             },
           });
 
+          // Fetch fresh data for email
           const ticketSnap = await db.collection("tickets").doc(docId).get();
           const ticket = ticketSnap.data();
+
+          // 4. TRIGGER EMAIL NOTIFICATION
+          if (ticket.userEmail) {
+             await sendCompletionEmail(ticket, ticket.remarks);
+          }
+
+          // Existing notification logic (internal)
           if (ticket && ticket.userId) {
             await db.collection("notifications").add({
               userId: ticket.userId,

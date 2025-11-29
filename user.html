@@ -12,10 +12,13 @@
     <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore-compat.js"></script>
+    
+    <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
+
     <script src="js/auth.js"></script>
 
     <script>
-      // Initialize Firebase
+      // 1. Initialize Firebase
       const firebaseConfig = {
         apiKey: "AIzaSyCsSFQkPN_I3W879JXTCHDZfiH3d-HFqt8",
         authDomain: "visto-35a45.firebaseapp.com",
@@ -28,6 +31,12 @@
 
       firebase.initializeApp(firebaseConfig);
       const db = firebase.firestore();
+
+      // 2. Initialize EmailJS
+      (function() {
+          // REPLACE THIS WITH YOUR ACTUAL PUBLIC KEY FROM EMAILJS DASHBOARD
+          emailjs.init("-MLS89N-SQ0aUPGNk"); 
+      })();
 
       // --- SESSION SECURITY CHECK ---
       firebase.auth().onAuthStateChanged((user) => {
@@ -321,34 +330,6 @@
         background: transparent;
       }
 
-      /* Dictionary / Knowledge Base */
-      .dictionary-item {
-        background: white;
-        border: 1px solid #e5e7eb;
-        border-left: 4px solid var(--primary-color);
-        border-radius: 8px;
-        padding: 12px 16px;
-        margin-bottom: 12px;
-        transition: transform 0.2s;
-      }
-
-      .dictionary-item:hover {
-        transform: translateX(4px);
-      }
-
-      .dictionary-item strong {
-        display: block;
-        color: var(--text-main);
-        font-size: 0.95rem;
-        margin-bottom: 4px;
-      }
-
-      .dictionary-item small {
-        color: var(--text-muted);
-        font-size: 0.85rem;
-        line-height: 1.4;
-      }
-
       /* Floating AI Button */
       #geminiChatBtn {
         position: fixed;
@@ -458,12 +439,12 @@
                 <label class="form-label">Issue Category</label>
                 <select id="issueSelect" class="form-select" required>
                   <option value="">What type of issue are you facing?</option>
-                  <option>Network Connectivity</option>
-                  <option>Repair/Troubleshoot</option>
-                  <option>Formatting</option>
-                  <option>Software Installation</option>
-                  <option>Internet Service</option>
-                  <option>Other</option>
+                  <option value="Network Connectivity">Network Connectivity</option>
+                  <option value="Repair/Troubleshoot">Repair/Troubleshoot</option>
+                  <option value="Formatting">Formatting</option>
+                  <option value="Software Installation">Software Installation</option>
+                  <option value="Internet Service">Internet Service</option>
+                  <option value="Other">Other</option>
                 </select>
               </div>
 
@@ -760,92 +741,6 @@
       const $$ = (sel, ctx = document) => Array.from(ctx.querySelectorAll(sel));
       const nowStr = () => new Date().toLocaleString();
 
-      // Dictionary Logic
-      const dictWrap = $("#dictionaryList");
-      const dictLoading = $("#dictionaryLoading");
-      // Store original HTML if dictWrap exists
-      const originalDictionaryHTML = dictWrap ? dictWrap.innerHTML : "";
-
-      function loadDictionary(filter = "") {
-        if (dictLoading) dictLoading.style.display = "block";
-        if (dictWrap) dictWrap.style.display = "none";
-
-        db.collection("dictionary").onSnapshot(
-          (snapshot) => {
-            if (!dictWrap) return; // Safety check
-
-            if (!snapshot.empty) {
-              dictWrap.innerHTML = "";
-              const q = filter.trim().toLowerCase();
-              let hasItems = false;
-
-              snapshot.forEach((doc) => {
-                const it = doc.data();
-                if (
-                  !q ||
-                  (it.title + " " + it.keywords + " " + it.solution)
-                    .toLowerCase()
-                    .includes(q)
-                ) {
-                  const el = document.createElement("div");
-                  el.className = "dictionary-item";
-                  el.innerHTML = `<strong>${it.title}</strong><small>${it.solution}</small>`;
-                  dictWrap.appendChild(el);
-                  hasItems = true;
-                }
-              });
-
-              if (!hasItems) {
-                dictWrap.innerHTML =
-                  '<div class="empty-state">No dictionary items matched your search.</div>';
-              }
-            }
-
-            if (dictLoading) dictLoading.style.display = "none";
-            if (dictWrap) dictWrap.style.display = "block";
-          },
-          (error) => {
-            console.error("Error loading dictionary:", error);
-            if (dictLoading) dictLoading.style.display = "none";
-            if (dictWrap) dictWrap.style.display = "block";
-          }
-        );
-      }
-
-      function searchDictionary(filter = "") {
-        if (!dictWrap) return;
-        const q = filter.trim().toLowerCase();
-
-        if (!q) {
-          dictWrap.innerHTML = originalDictionaryHTML;
-          return;
-        }
-
-        const items = Array.from(dictWrap.querySelectorAll(".dictionary-item"));
-        let hasMatches = false;
-        dictWrap.innerHTML = "";
-
-        items.forEach((item) => {
-          const text = item.textContent.toLowerCase();
-          if (text.includes(q)) {
-            dictWrap.appendChild(item.cloneNode(true));
-            hasMatches = true;
-          }
-        });
-
-        if (!hasMatches) {
-          dictWrap.innerHTML =
-            '<div class="empty-state">No dictionary items matched your search.</div>';
-        }
-      }
-
-      const dictSearchInput = $("#dictSearch");
-      if (dictSearchInput) {
-        dictSearchInput.addEventListener("input", (e) =>
-          searchDictionary(e.target.value)
-        );
-      }
-
       // Ticket Form Logic
       const form = $("#ticketForm");
       const imageInput = $("#imageInput");
@@ -1062,6 +957,11 @@
             };
 
             await db.collection("tickets").add(newTicket);
+
+            // --- EMAILJS NOTIFICATION LOGIC ---
+            // Triggers automatically when a ticket is created
+            await sendEmailNotification(currentUser.email, newTicket);
+            // ----------------------------------
 
             $("#name").value = "";
             $("#schoolId").value = "";
@@ -1325,8 +1225,31 @@
         initializeUserData();
       });
 
-      // Safely hide dictLoading at the end
-      if (dictLoading) dictLoading.style.display = "none";
+      // -------------------------------------------------------------
+      // EMAILJS SENDING FUNCTION
+      // -------------------------------------------------------------
+      async function sendEmailNotification(toEmail, ticketData) {
+        // REPLACE THESE WITH YOUR ACTUAL IDs FROM EMAILJS DASHBOARD
+        const serviceID = "service_4v7dh2w";
+        const templateID = "template_cstixmf";
+
+        // Must match variables in your EmailJS Template
+        const templateParams = {
+            to_name: ticketData.name,
+            to_email: toEmail,
+            ticket_id: ticketData.id,
+            issue_category: ticketData.issue,
+            ticket_description: ticketData.description,
+            ticket_time: ticketData.time
+        };
+
+        try {
+            await emailjs.send(serviceID, templateID, templateParams);
+            console.log("Email sent via EmailJS successfully!");
+        } catch (error) {
+            console.error("EmailJS Error:", error);
+        }
+      }
     </script>
   </body>
 </html>
